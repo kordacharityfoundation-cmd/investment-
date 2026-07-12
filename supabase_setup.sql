@@ -1,29 +1,56 @@
 -- ============================================================================
 -- MUSK INVESTMENT - PRODUCTION SUPABASE DATABASE SCHEMA & MIGRATIONS
 -- DESIGNED FOR POSTGRESQL (SUPABASE PLPGSQL COMPLIANT)
+-- FULLY IDEMPOTENT & MULTI-RUN COMPATIBLE
 -- ============================================================================
 
 -- Enable UUID extension if not already enabled
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================================
--- 1. ROLES AND CUSTOM TYPES / ENUMS
+-- 1. ROLES AND CUSTOM TYPES / ENUMS (Safely created if they do not exist)
 -- ============================================================================
-CREATE TYPE user_status_type AS ENUM ('Active', 'Suspended');
-CREATE TYPE user_role_type AS ENUM ('user', 'admin');
-CREATE TYPE withdrawal_status_type AS ENUM ('Pending', 'Approved', 'Rejected');
-CREATE TYPE deposit_status_type AS ENUM ('Pending', 'Approved', 'Rejected');
-CREATE TYPE ticket_status_type AS ENUM ('Open', 'Pending', 'Resolved', 'Closed');
-CREATE TYPE ticket_priority_type AS ENUM ('Low', 'Medium', 'High');
-CREATE TYPE announcement_category_type AS ENUM ('Update', 'Alert', 'Maintenance', 'General');
-CREATE TYPE activity_log_type AS ENUM ('User', 'Admin');
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_status_type') THEN
+        CREATE TYPE user_status_type AS ENUM ('Active', 'Suspended');
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role_type') THEN
+        CREATE TYPE user_role_type AS ENUM ('user', 'admin');
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'withdrawal_status_type') THEN
+        CREATE TYPE withdrawal_status_type AS ENUM ('Pending', 'Approved', 'Rejected');
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'deposit_status_type') THEN
+        CREATE TYPE deposit_status_type AS ENUM ('Pending', 'Approved', 'Rejected');
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ticket_status_type') THEN
+        CREATE TYPE ticket_status_type AS ENUM ('Open', 'Pending', 'Resolved', 'Closed');
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ticket_priority_type') THEN
+        CREATE TYPE ticket_priority_type AS ENUM ('Low', 'Medium', 'High');
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'announcement_category_type') THEN
+        CREATE TYPE announcement_category_type AS ENUM ('Update', 'Alert', 'Maintenance', 'General');
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'activity_log_type') THEN
+        CREATE TYPE activity_log_type AS ENUM ('User', 'Admin');
+    END IF;
+END$$;
 
 -- ============================================================================
--- 2. TABLES SCHEMAS
+-- 2. TABLES SCHEMAS (Using IF NOT EXISTS to prevent error 42P07)
 -- ============================================================================
 
 -- A. Users Profile Table (Extends Supabase auth.users)
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -37,7 +64,7 @@ CREATE TABLE public.profiles (
 );
 
 -- B. Investment Plans Table
-CREATE TABLE public.investment_plans (
+CREATE TABLE IF NOT EXISTS public.investment_plans (
     id VARCHAR(100) PRIMARY KEY,
     name VARCHAR(255) UNIQUE NOT NULL,
     apr NUMERIC(5, 2) NOT NULL CHECK (apr >= 0),
@@ -49,7 +76,7 @@ CREATE TABLE public.investment_plans (
 );
 
 -- C. User Deposits Ledger Table
-CREATE TABLE public.deposits (
+CREATE TABLE IF NOT EXISTS public.deposits (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     user_email VARCHAR(255) NOT NULL,
@@ -63,7 +90,7 @@ CREATE TABLE public.deposits (
 );
 
 -- D. Withdrawal Requests Table
-CREATE TABLE public.withdrawals (
+CREATE TABLE IF NOT EXISTS public.withdrawals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     user_email VARCHAR(255) NOT NULL,
@@ -77,7 +104,7 @@ CREATE TABLE public.withdrawals (
 );
 
 -- E. System Announcements Table
-CREATE TABLE public.announcements (
+CREATE TABLE IF NOT EXISTS public.announcements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     text TEXT NOT NULL,
     category announcement_category_type NOT NULL DEFAULT 'General',
@@ -85,7 +112,7 @@ CREATE TABLE public.announcements (
 );
 
 -- F. Support Tickets Table
-CREATE TABLE public.support_tickets (
+CREATE TABLE IF NOT EXISTS public.support_tickets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     user_email VARCHAR(255) NOT NULL,
@@ -100,7 +127,7 @@ CREATE TABLE public.support_tickets (
 );
 
 -- G. Support Ticket Replies Table
-CREATE TABLE public.ticket_replies (
+CREATE TABLE IF NOT EXISTS public.ticket_replies (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     ticket_id UUID REFERENCES public.support_tickets(id) ON DELETE CASCADE NOT NULL,
     sender VARCHAR(50) NOT NULL CHECK (sender IN ('user', 'admin')),
@@ -110,7 +137,7 @@ CREATE TABLE public.ticket_replies (
 );
 
 -- H. Chat Messages Table
-CREATE TABLE public.chat_messages (
+CREATE TABLE IF NOT EXISTS public.chat_messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     user_email VARCHAR(255) NOT NULL,
@@ -121,7 +148,7 @@ CREATE TABLE public.chat_messages (
 );
 
 -- I. Secure Activity Logs Table
-CREATE TABLE public.activity_logs (
+CREATE TABLE IF NOT EXISTS public.activity_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     user_email VARCHAR(255) NOT NULL,
@@ -131,7 +158,7 @@ CREATE TABLE public.activity_logs (
 );
 
 -- J. User Notifications Table
-CREATE TABLE public.notifications (
+CREATE TABLE IF NOT EXISTS public.notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     user_email VARCHAR(255) NOT NULL,
@@ -143,7 +170,7 @@ CREATE TABLE public.notifications (
 );
 
 -- K. Payment Wallets Configuration (Singleton Table)
-CREATE TABLE public.payment_config (
+CREATE TABLE IF NOT EXISTS public.payment_config (
     id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
     bank_name VARCHAR(255) NOT NULL,
     account_name VARCHAR(255) NOT NULL,
@@ -156,7 +183,7 @@ CREATE TABLE public.payment_config (
 );
 
 -- L. QR Codes Configurations (Singleton Table)
-CREATE TABLE public.qr_config (
+CREATE TABLE IF NOT EXISTS public.qr_config (
     id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
     btc_qr TEXT NOT NULL,
     usdt_trc_qr TEXT NOT NULL,
@@ -166,7 +193,7 @@ CREATE TABLE public.qr_config (
 );
 
 -- M. Main System Settings (Singleton Table)
-CREATE TABLE public.system_settings (
+CREATE TABLE IF NOT EXISTS public.system_settings (
     id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
     website_name VARCHAR(255) NOT NULL DEFAULT 'Musk Investment',
     support_email VARCHAR(255) NOT NULL DEFAULT 'support@muskinvestment.com',
@@ -182,21 +209,21 @@ CREATE TABLE public.system_settings (
 );
 
 -- ============================================================================
--- 3. INDEXES FOR QUERY OPTIMIZATION
+-- 3. INDEXES FOR QUERY OPTIMIZATION (Using IF NOT EXISTS)
 -- ============================================================================
-CREATE INDEX idx_profiles_email ON public.profiles(email);
-CREATE INDEX idx_profiles_role ON public.profiles(role);
-CREATE INDEX idx_deposits_user_id ON public.deposits(user_id);
-CREATE INDEX idx_deposits_status ON public.deposits(status);
-CREATE INDEX idx_withdrawals_user_id ON public.withdrawals(user_id);
-CREATE INDEX idx_withdrawals_status ON public.withdrawals(status);
-CREATE INDEX idx_support_tickets_user_id ON public.support_tickets(user_id);
-CREATE INDEX idx_support_tickets_status ON public.support_tickets(status);
-CREATE INDEX idx_ticket_replies_ticket_id ON public.ticket_replies(ticket_id);
-CREATE INDEX idx_chat_messages_user_id ON public.chat_messages(user_id);
-CREATE INDEX idx_activity_logs_user_id ON public.activity_logs(user_id);
-CREATE INDEX idx_notifications_user_id ON public.notifications(user_id);
-CREATE INDEX idx_notifications_is_read ON public.notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email);
+CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role);
+CREATE INDEX IF NOT EXISTS idx_deposits_user_id ON public.deposits(user_id);
+CREATE INDEX IF NOT EXISTS idx_deposits_status ON public.deposits(status);
+CREATE INDEX IF NOT EXISTS idx_withdrawals_user_id ON public.withdrawals(user_id);
+CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON public.withdrawals(status);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_user_id ON public.support_tickets(user_id);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON public.support_tickets(status);
+CREATE INDEX IF NOT EXISTS idx_ticket_replies_ticket_id ON public.ticket_replies(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON public.chat_messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON public.activity_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON public.notifications(is_read);
 
 -- ============================================================================
 -- 4. ROW-LEVEL SECURITY (RLS) POLICIES
@@ -229,63 +256,81 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Profile Policies
+DROP POLICY IF EXISTS "Public profiles are readable by anyone" ON public.profiles;
 CREATE POLICY "Public profiles are readable by anyone" ON public.profiles
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can edit their own profiles" ON public.profiles;
 CREATE POLICY "Users can edit their own profiles" ON public.profiles
     FOR UPDATE USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Admin can perform any action on profiles" ON public.profiles;
 CREATE POLICY "Admin can perform any action on profiles" ON public.profiles
     FOR ALL USING (public.is_admin());
 
 -- Investment Plans Policies
+DROP POLICY IF EXISTS "Investment plans are viewable by everyone" ON public.investment_plans;
 CREATE POLICY "Investment plans are viewable by everyone" ON public.investment_plans
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Only Admin can manage investment plans" ON public.investment_plans;
 CREATE POLICY "Only Admin can manage investment plans" ON public.investment_plans
     FOR ALL USING (public.is_admin());
 
 -- Deposits Policies
+DROP POLICY IF EXISTS "Users can view their own deposits" ON public.deposits;
 CREATE POLICY "Users can view their own deposits" ON public.deposits
     FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create their own deposits" ON public.deposits;
 CREATE POLICY "Users can create their own deposits" ON public.deposits
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admin can perform any action on deposits" ON public.deposits;
 CREATE POLICY "Admin can perform any action on deposits" ON public.deposits
     FOR ALL USING (public.is_admin());
 
 -- Withdrawals Policies
+DROP POLICY IF EXISTS "Users can view their own withdrawals" ON public.withdrawals;
 CREATE POLICY "Users can view their own withdrawals" ON public.withdrawals
     FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can request a withdrawal" ON public.withdrawals;
 CREATE POLICY "Users can request a withdrawal" ON public.withdrawals
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admin can manage all withdrawals" ON public.withdrawals;
 CREATE POLICY "Admin can manage all withdrawals" ON public.withdrawals
     FOR ALL USING (public.is_admin());
 
 -- Announcements Policies
+DROP POLICY IF EXISTS "Announcements are viewable by everyone" ON public.announcements;
 CREATE POLICY "Announcements are viewable by everyone" ON public.announcements
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Only Admin can manage announcements" ON public.announcements;
 CREATE POLICY "Only Admin can manage announcements" ON public.announcements
     FOR ALL USING (public.is_admin());
 
 -- Support Tickets Policies
+DROP POLICY IF EXISTS "Users can view their own support tickets" ON public.support_tickets;
 CREATE POLICY "Users can view their own support tickets" ON public.support_tickets
     FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can open tickets" ON public.support_tickets;
 CREATE POLICY "Users can open tickets" ON public.support_tickets
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can modify their open tickets" ON public.support_tickets;
 CREATE POLICY "Users can modify their open tickets" ON public.support_tickets
     FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admin can manage all tickets" ON public.support_tickets;
 CREATE POLICY "Admin can manage all tickets" ON public.support_tickets
     FOR ALL USING (public.is_admin());
 
 -- Ticket Replies Policies
+DROP POLICY IF EXISTS "Users can view replies for their own tickets" ON public.ticket_replies;
 CREATE POLICY "Users can view replies for their own tickets" ON public.ticket_replies
     FOR SELECT USING (
         EXISTS (
@@ -294,6 +339,7 @@ CREATE POLICY "Users can view replies for their own tickets" ON public.ticket_re
         )
     );
 
+DROP POLICY IF EXISTS "Users can add replies to their own tickets" ON public.ticket_replies;
 CREATE POLICY "Users can add replies to their own tickets" ON public.ticket_replies
     FOR INSERT WITH CHECK (
         EXISTS (
@@ -302,41 +348,58 @@ CREATE POLICY "Users can add replies to their own tickets" ON public.ticket_repl
         ) AND sender = 'user'
     );
 
+DROP POLICY IF EXISTS "Admin can manage all ticket replies" ON public.ticket_replies;
 CREATE POLICY "Admin can manage all ticket replies" ON public.ticket_replies
     FOR ALL USING (public.is_admin());
 
 -- Chat Messages Policies
+DROP POLICY IF EXISTS "Users can view their chats" ON public.chat_messages;
 CREATE POLICY "Users can view their chats" ON public.chat_messages
     FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
 
+DROP POLICY IF EXISTS "Users can submit chat messages" ON public.chat_messages;
 CREATE POLICY "Users can submit chat messages" ON public.chat_messages
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admin can manage all chat messages" ON public.chat_messages;
 CREATE POLICY "Admin can manage all chat messages" ON public.chat_messages
     FOR ALL USING (public.is_admin());
 
 -- Activity Logs Policies
+DROP POLICY IF EXISTS "Users can view their own activity logs" ON public.activity_logs;
 CREATE POLICY "Users can view their own activity logs" ON public.activity_logs
     FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admin can view all activity logs" ON public.activity_logs;
 CREATE POLICY "Admin can view all activity logs" ON public.activity_logs
     FOR ALL USING (public.is_admin());
 
 -- Notifications Policies
+DROP POLICY IF EXISTS "Users can manage their own notifications" ON public.notifications;
 CREATE POLICY "Users can manage their own notifications" ON public.notifications
     FOR ALL USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admin can manage all notifications" ON public.notifications;
 CREATE POLICY "Admin can manage all notifications" ON public.notifications
     FOR ALL USING (public.is_admin());
 
 -- Payment Wallets, QR, and System Settings Singleton Policies
+DROP POLICY IF EXISTS "Configs are readable by everyone" ON public.payment_config;
 CREATE POLICY "Configs are readable by everyone" ON public.payment_config FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Only Admin can manage payment config" ON public.payment_config;
 CREATE POLICY "Only Admin can manage payment config" ON public.payment_config FOR ALL USING (public.is_admin());
 
+DROP POLICY IF EXISTS "QR Configs are readable by everyone" ON public.qr_config;
 CREATE POLICY "QR Configs are readable by everyone" ON public.qr_config FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Only Admin can manage QR config" ON public.qr_config;
 CREATE POLICY "Only Admin can manage QR config" ON public.qr_config FOR ALL USING (public.is_admin());
 
+DROP POLICY IF EXISTS "System settings are readable by everyone" ON public.system_settings;
 CREATE POLICY "System settings are readable by everyone" ON public.system_settings FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Only Admin can manage system settings" ON public.system_settings;
 CREATE POLICY "Only Admin can manage system settings" ON public.system_settings FOR ALL USING (public.is_admin());
 
 
@@ -369,7 +432,8 @@ BEGIN
     'Active',
     'user',
     'SEED_' || floor(random() * 10000)::text
-  );
+  )
+  ON CONFLICT (id) DO NOTHING;
   
   -- Create welcome notification
   INSERT INTO public.notifications (user_id, user_email, title, message, type)
@@ -379,14 +443,16 @@ BEGIN
     'Investor Node Certified',
     'Welcome to Musk Investments. Your asset-compounding node is fully synced and operational.',
     'general'
-  );
+  )
+  ON CONFLICT DO NOTHING;
   
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger to execute upon registration
-CREATE OR REPLACE TRIGGER on_auth_user_created
+-- Trigger to execute upon registration (Dropped first to avoid already exists error)
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_signup();
 
@@ -400,9 +466,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_profiles_timestamp ON public.profiles;
 CREATE TRIGGER update_profiles_timestamp BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.update_modified_timestamp();
+
+DROP TRIGGER IF EXISTS update_deposits_timestamp ON public.deposits;
 CREATE TRIGGER update_deposits_timestamp BEFORE UPDATE ON public.deposits FOR EACH ROW EXECUTE FUNCTION public.update_modified_timestamp();
+
+DROP TRIGGER IF EXISTS update_withdrawals_timestamp ON public.withdrawals;
 CREATE TRIGGER update_withdrawals_timestamp BEFORE UPDATE ON public.withdrawals FOR EACH ROW EXECUTE FUNCTION public.update_modified_timestamp();
+
+DROP TRIGGER IF EXISTS update_support_tickets_timestamp ON public.support_tickets;
 CREATE TRIGGER update_support_tickets_timestamp BEFORE UPDATE ON public.support_tickets FOR EACH ROW EXECUTE FUNCTION public.update_modified_timestamp();
 
 
@@ -445,10 +518,14 @@ INSERT INTO public.qr_config (id, btc_qr, usdt_trc_qr, usdt_erc_qr, bank_qr) VAL
 (1, 'default_btc', 'default_trc', 'default_erc', 'default_bank')
 ON CONFLICT (id) DO NOTHING;
 
--- E. Seed System Announcements
-INSERT INTO public.announcements (text, category) VALUES
-('Bitcoin deposit address has been optimized. Please verify the new address before initiating transfers.', 'Update'),
-('Weekly network security audit completed. All node escrow deposits successfully validated on the secure ledger.', 'General');
+-- E. Seed System Announcements (Only if they don't already exist)
+INSERT INTO public.announcements (text, category)
+SELECT 'Bitcoin deposit address has been optimized. Please verify the new address before initiating transfers.', 'Update'::announcement_category_type
+WHERE NOT EXISTS (SELECT 1 FROM public.announcements WHERE text = 'Bitcoin deposit address has been optimized. Please verify the new address before initiating transfers.');
+
+INSERT INTO public.announcements (text, category)
+SELECT 'Weekly network security audit completed. All node escrow deposits successfully validated on the secure ledger.', 'General'::announcement_category_type
+WHERE NOT EXISTS (SELECT 1 FROM public.announcements WHERE text = 'Weekly network security audit completed. All node escrow deposits successfully validated on the secure ledger.');
 
 -- ============================================================================
 -- END OF MIGRATION SETUP
