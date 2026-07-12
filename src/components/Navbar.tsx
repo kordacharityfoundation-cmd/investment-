@@ -69,52 +69,68 @@ export default function Navbar({ user, onLogout, onOpenAuth, currentView, onChan
             <div className="rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 p-2 border border-purple-400/30">
               <Rocket className="h-4.5 w-4.5 text-white" />
             </div>
-            <span>MUSK INVESTMENT</span>
+            <div className="flex items-center gap-2">
+              <span>MUSK INVESTMENT</span>
+              {currentView === 'dashboard' && (
+                <span className="text-[9px] font-mono tracking-widest text-purple-400 font-bold uppercase bg-purple-500/10 px-2.5 py-0.5 rounded-full border border-purple-500/20">
+                  Dashboard
+                </span>
+              )}
+              {currentView === 'admin' && (
+                <span className="text-[9px] font-mono tracking-widest text-red-400 font-bold uppercase bg-red-500/10 px-2.5 py-0.5 rounded-full border border-red-500/20">
+                  Admin
+                </span>
+              )}
+            </div>
           </a>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6 lg:gap-8">
-            <div className="flex items-center gap-4 lg:gap-6">
-              {navItems.map((item) => (
-                <a
-                  key={item.name}
-                  href={item.href}
-                  onClick={(e) => { e.preventDefault(); handleNavClick(item.href); }}
-                  className="text-xs lg:text-sm font-medium text-gray-300 hover:text-purple-400 transition-colors duration-200"
-                >
-                  {item.name}
-                </a>
-              ))}
-            </div>
+            {currentView === 'landing' ? (
+              <>
+                <div className="flex items-center gap-4 lg:gap-6">
+                  {navItems.map((item) => (
+                    <a
+                      key={item.name}
+                      href={item.href}
+                      onClick={(e) => { e.preventDefault(); handleNavClick(item.href); }}
+                      className="text-xs lg:text-sm font-medium text-gray-300 hover:text-purple-400 transition-colors duration-200"
+                    >
+                      {item.name}
+                    </a>
+                  ))}
+                </div>
 
-            {/* Premium Integrated View Switcher (Only visible when user is logged in) */}
-            {user?.isLoggedIn && (
-              <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1 shadow-inner">
-                <button
-                  onClick={() => onChangeView('landing')}
-                  className={`px-3 py-1.5 rounded-lg font-semibold text-[11px] transition-all flex items-center gap-1.5 min-h-[28px] ${
-                    currentView === 'landing'
-                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30 shadow-sm'
-                      : 'text-gray-400 hover:text-white border border-transparent'
-                  }`}
-                >
-                  <Globe className="h-3.5 w-3.5" />
-                  <span>Website</span>
-                </button>
-                
-                <button
-                  id="switch-to-user-dashboard-btn"
-                  onClick={() => onChangeView('dashboard')}
-                  className={`px-3 py-1.5 rounded-lg font-semibold text-[11px] transition-all flex items-center gap-1.5 min-h-[28px] ${
-                    currentView === 'dashboard'
-                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30 shadow-sm'
-                      : 'text-gray-400 hover:text-white border border-transparent'
-                  }`}
-                >
-                  <LayoutDashboard className="h-3.5 w-3.5" />
-                  <span>Dashboard</span>
-                </button>
-              </div>
+                {/* Premium Integrated View Switcher (Only visible when user is logged in) */}
+                {user?.isLoggedIn && (
+                  <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1 shadow-inner">
+                    <button
+                      onClick={() => onChangeView('landing')}
+                      className="px-3 py-1.5 rounded-lg font-semibold text-[11px] transition-all flex items-center gap-1.5 min-h-[28px] bg-purple-600/20 text-purple-300 border border-purple-500/30 shadow-sm"
+                    >
+                      <Globe className="h-3.5 w-3.5" />
+                      <span>Website</span>
+                    </button>
+                    
+                    <button
+                      id="switch-to-user-dashboard-btn"
+                      onClick={() => onChangeView('dashboard')}
+                      className="px-3 py-1.5 rounded-lg font-semibold text-[11px] transition-all flex items-center gap-1.5 min-h-[28px] text-gray-400 hover:text-white border border-transparent"
+                    >
+                      <LayoutDashboard className="h-3.5 w-3.5" />
+                      <span>Dashboard</span>
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <button
+                onClick={() => onChangeView('landing')}
+                className="text-[11px] font-bold text-gray-400 hover:text-purple-300 transition-all flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5 hover:bg-purple-500/10 hover:border-purple-500/20 mr-2"
+              >
+                <Globe className="h-3.5 w-3.5" />
+                <span>Go to Website</span>
+              </button>
             )}
 
             {/* CTA Buttons or User State */}
@@ -176,87 +192,115 @@ export default function Navbar({ user, onLogout, onOpenAuth, currentView, onChan
               className="md:hidden border-b border-white/5 bg-[#030310]/95 backdrop-blur-xl overflow-hidden"
             >
               <div className="px-6 py-6 space-y-4">
-                <div className="flex flex-col gap-3">
-                  {navItems.map((item) => (
-                    <a
-                      key={item.name}
-                      href={item.href}
-                      onClick={(e) => { e.preventDefault(); handleNavClick(item.href); }}
-                      className="text-base font-medium text-gray-300 hover:text-purple-400 transition-colors py-2 flex items-center justify-between border-b border-white/5"
-                    >
-                      <span>{item.name}</span>
-                      <ChevronRight className="h-4 w-4 opacity-50" />
-                    </a>
-                  ))}
-                </div>
-
-                <div className="pt-4 flex flex-col gap-3">
-                  {user?.isLoggedIn ? (
+                {currentView === 'landing' ? (
+                  <>
                     <div className="flex flex-col gap-3">
-                      {/* Premium Mobile View Switcher */}
-                      <div className="grid grid-cols-2 gap-1 bg-white/5 border border-white/10 rounded-xl p-1">
-                        <button
-                          onClick={() => { onChangeView('landing'); setIsOpen(false); }}
-                          className={`py-2 rounded-lg font-semibold text-[11px] transition-all flex flex-col items-center justify-center gap-1 ${
-                            currentView === 'landing' 
-                              ? 'bg-purple-600/20 text-purple-300 border border-purple-500/20' 
-                              : 'text-gray-400 hover:text-white'
-                          }`}
+                      {navItems.map((item) => (
+                        <a
+                          key={item.name}
+                          href={item.href}
+                          onClick={(e) => { e.preventDefault(); handleNavClick(item.href); }}
+                          className="text-base font-medium text-gray-300 hover:text-purple-400 transition-colors py-2 flex items-center justify-between border-b border-white/5"
                         >
-                          <Globe className="h-4 w-4" />
-                          <span>Website</span>
-                        </button>
-                        <button
-                          id="switch-to-user-dashboard-btn-mobile"
-                          onClick={() => { onChangeView('dashboard'); setIsOpen(false); }}
-                          className={`py-2 rounded-lg font-semibold text-[11px] transition-all flex flex-col items-center justify-center gap-1 ${
-                            currentView === 'dashboard' 
-                              ? 'bg-purple-600/20 text-purple-300 border border-purple-500/20' 
-                              : 'text-gray-400 hover:text-white'
-                          }`}
-                        >
-                          <LayoutDashboard className="h-4 w-4" />
-                          <span>Dashboard</span>
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
-                        <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center border border-white/20 text-sm font-bold text-white">
-                          {user.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-200">{user.name}</p>
-                          <p className="text-xs text-gray-500">{user.email}</p>
-                        </div>
-                      </div>
-                      <button
-                        id="logout-btn-mobile"
-                        onClick={() => { onLogout(); setIsOpen(false); }}
-                        className="w-full rounded-xl border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 py-3 text-sm font-semibold text-red-400 transition-all flex items-center justify-center gap-2"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        Log Out
-                      </button>
+                          <span>{item.name}</span>
+                          <ChevronRight className="h-4 w-4 opacity-50" />
+                        </a>
+                      ))}
                     </div>
-                  ) : (
-                    <>
-                      <button
-                        id="login-btn-mobile"
-                        onClick={() => { onOpenAuth('login'); setIsOpen(false); }}
-                        className="w-full rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white hover:bg-white/10 transition-all"
-                      >
-                        Login
-                      </button>
-                      <button
-                        id="register-btn-mobile"
-                        onClick={() => { onOpenAuth('register'); setIsOpen(false); }}
-                        className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/10 transition-all"
-                      >
-                        Register
-                      </button>
-                    </>
-                  )}
-                </div>
+
+                    <div className="pt-4 flex flex-col gap-3">
+                      {user?.isLoggedIn ? (
+                        <div className="flex flex-col gap-3">
+                          {/* Premium Mobile View Switcher */}
+                          <div className="grid grid-cols-2 gap-1 bg-white/5 border border-white/10 rounded-xl p-1">
+                            <button
+                              onClick={() => { onChangeView('landing'); setIsOpen(false); }}
+                              className="py-2 rounded-lg font-semibold text-[11px] transition-all flex flex-col items-center justify-center gap-1 bg-purple-600/20 text-purple-300 border border-purple-500/20"
+                            >
+                              <Globe className="h-4 w-4" />
+                              <span>Website</span>
+                            </button>
+                            <button
+                              id="switch-to-user-dashboard-btn-mobile"
+                              onClick={() => { onChangeView('dashboard'); setIsOpen(false); }}
+                              className="py-2 rounded-lg font-semibold text-[11px] transition-all flex flex-col items-center justify-center gap-1 text-gray-400 hover:text-white"
+                            >
+                              <LayoutDashboard className="h-4 w-4" />
+                              <span>Dashboard</span>
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center border border-white/20 text-sm font-bold text-white">
+                              {user.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-200">{user.name}</p>
+                              <p className="text-xs text-gray-500">{user.email}</p>
+                            </div>
+                          </div>
+                          <button
+                            id="logout-btn-mobile"
+                            onClick={() => { onLogout(); setIsOpen(false); }}
+                            className="w-full rounded-xl border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 py-3 text-sm font-semibold text-red-400 transition-all flex items-center justify-center gap-2"
+                          >
+                            <LogOut className="h-4 w-4" />
+                            Log Out
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            id="login-btn-mobile"
+                            onClick={() => { onOpenAuth('login'); setIsOpen(false); }}
+                            className="w-full rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white hover:bg-white/10 transition-all"
+                          >
+                            Login
+                          </button>
+                          <button
+                            id="register-btn-mobile"
+                            onClick={() => { onOpenAuth('register'); setIsOpen(false); }}
+                            className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/10 transition-all"
+                          >
+                            Register
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={() => { onChangeView('landing'); setIsOpen(false); }}
+                      className="w-full rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 py-3 text-sm font-semibold text-gray-300 transition-all flex items-center justify-center gap-2 mb-2"
+                    >
+                      <Globe className="h-4.5 w-4.5 text-purple-400" />
+                      <span>Go to Website</span>
+                    </button>
+
+                    {user?.isLoggedIn && (
+                      <>
+                        <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+                          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center border border-white/20 text-sm font-bold text-white">
+                            {user.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-200">{user.name}</p>
+                            <p className="text-xs text-gray-500">{user.email}</p>
+                          </div>
+                        </div>
+                        <button
+                          id="logout-btn-mobile"
+                          onClick={() => { onLogout(); setIsOpen(false); }}
+                          className="w-full rounded-xl border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 py-3 text-sm font-semibold text-red-400 transition-all flex items-center justify-center gap-2"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Log Out
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
