@@ -10,6 +10,7 @@ import { InvestmentPlan, UserState } from '../types';
 interface PlansProps {
   user: UserState | null;
   onOpenAuth: (tab: 'login' | 'register') => void;
+  onSelectPlan?: (plan: InvestmentPlan) => void;
 }
 
 export interface DepositTransaction {
@@ -26,7 +27,7 @@ export interface DepositTransaction {
   screenshotUrl?: string;
 }
 
-export default function Plans({ user, onOpenAuth }: PlansProps) {
+export default function Plans({ user, onOpenAuth, onSelectPlan }: PlansProps) {
   // Loaded dynamic parameters
   const [investmentPlans, setInvestmentPlans] = useState<InvestmentPlan[]>([]);
   const [paymentConfig, setPaymentConfig] = useState<any>({});
@@ -266,43 +267,7 @@ export default function Plans({ user, onOpenAuth }: PlansProps) {
   }, []);
 
   // Helper seed data to populate some historical status cards for Pending, Approved, Rejected
-  const getSeedDeposits = (): DepositTransaction[] => [
-    {
-      id: 'dep-1',
-      planId: 'plan-3',
-      planName: 'Gigafactory Battery Power',
-      amount: 3000,
-      paymentMethod: 'USDT (TRC20)',
-      date: '2026-07-01 10:15',
-      status: 'Approved',
-      referenceNo: 'MSK-92716-DEP',
-      transactionId: 'TXN-91823901239102',
-      notes: 'Initial test deposit for clean energy.'
-    },
-    {
-      id: 'dep-2',
-      planId: 'plan-1',
-      planName: 'Boring Venture Node',
-      amount: 1000,
-      paymentMethod: 'Bitcoin (BTC)',
-      date: '2026-07-08 14:40',
-      status: 'Pending',
-      referenceNo: 'MSK-55102-DEP',
-      transactionId: 'TXN-1019238128',
-      notes: 'Tunnel node configuration stake.'
-    },
-    {
-      id: 'dep-3',
-      planId: 'plan-2',
-      planName: 'Optimus Kinetic Core',
-      amount: 2000,
-      paymentMethod: 'Bank Transfer',
-      date: '2026-06-25 09:00',
-      status: 'Rejected',
-      referenceNo: 'MSK-43211-DEP',
-      notes: 'Incorrect bank wire description details.'
-    }
-  ];
+  const getSeedDeposits = (): DepositTransaction[] => [];
 
   // Save deposits helper
   const saveDeposits = (newDeposits: DepositTransaction[]) => {
@@ -314,6 +279,10 @@ export default function Plans({ user, onOpenAuth }: PlansProps) {
   const handleSelectPlan = (plan: InvestmentPlan) => {
     if (!user?.isLoggedIn) {
       onOpenAuth('register');
+      return;
+    }
+    if (onSelectPlan) {
+      onSelectPlan(plan);
       return;
     }
     setSelectedPlan(plan);

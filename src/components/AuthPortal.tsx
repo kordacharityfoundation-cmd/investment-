@@ -68,15 +68,42 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      // Simulate login success
-      const displayName = loginEmail.split('@')[0].toUpperCase();
-      const mockUser: UserState = {
+      
+      const savedUsersRaw = localStorage.getItem('musk_users');
+      let usersList = [];
+      if (savedUsersRaw) {
+        try {
+          usersList = JSON.parse(savedUsersRaw);
+        } catch (err) {
+          usersList = [];
+        }
+      }
+
+      const userFound = usersList.find((u: any) => u.email.toLowerCase() === loginEmail.toLowerCase());
+      if (!userFound) {
+        setError('This email address is not registered on our gateway. Please register first.');
+        return;
+      }
+
+      if (userFound.status === 'Suspended') {
+        setError('Your investor account has been suspended by our compliance board. Access denied.');
+        return;
+      }
+
+      const isValidPassword = !userFound.password || userFound.password === loginPassword;
+      if (!isValidPassword) {
+        setError('Invalid compliance password signature. Please verify your credentials.');
+        return;
+      }
+
+      const loggedUser: UserState = {
         isLoggedIn: true,
-        name: displayName,
-        email: loginEmail,
-        avatarSeed: displayName
+        name: userFound.name,
+        email: userFound.email,
+        avatarSeed: userFound.name.toUpperCase()
       };
-      onAuthSuccess(mockUser);
+      
+      onAuthSuccess(loggedUser);
       onClose();
     }, 1500);
   };
@@ -103,6 +130,41 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
 
     setLoading(true);
     setTimeout(() => {
+      const savedUsersRaw = localStorage.getItem('musk_users');
+      let currentUsers = [];
+      if (savedUsersRaw) {
+        try {
+          currentUsers = JSON.parse(savedUsersRaw);
+        } catch (err) {
+          currentUsers = [];
+        }
+      }
+
+      const exists = currentUsers.some((u: any) => u.email.toLowerCase() === regEmail.toLowerCase());
+      if (exists) {
+        setLoading(false);
+        setError('This email address is already registered on our gateway.');
+        return;
+      }
+
+      const searchParams = new URLSearchParams(window.location.search);
+      const referralCode = searchParams.get('ref') || '';
+
+      const newUser = {
+        id: `user-${Date.now()}`,
+        name: regName,
+        email: regEmail,
+        phone: regPhone,
+        address: regAddress,
+        status: 'Active' as const,
+        dateCreated: new Date().toISOString().substring(0, 10),
+        password: regPassword,
+        referredBy: referralCode
+      };
+
+      currentUsers.push(newUser);
+      localStorage.setItem('musk_users', JSON.stringify(currentUsers));
+
       setLoading(false);
       // Go to email verification screen as requested
       setView('verify');

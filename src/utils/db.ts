@@ -8,6 +8,8 @@ export interface AdminUser {
   address: string;
   status: 'Active' | 'Suspended';
   dateCreated: string;
+  password?: string;
+  referredBy?: string;
 }
 
 export interface WithdrawalRequest {
@@ -148,7 +150,8 @@ export const DEFAULT_USERS: AdminUser[] = [
     phone: '+1 (555) 420-6969',
     address: '1 Starbase Blvd, Boca Chica, TX',
     status: 'Active',
-    dateCreated: '2026-06-01'
+    dateCreated: '2026-06-01',
+    password: 'password123'
   },
   {
     id: 'user-2',
@@ -157,7 +160,8 @@ export const DEFAULT_USERS: AdminUser[] = [
     phone: '+380 (50) 123-4567',
     address: '12 Kiev Street, Ukraine',
     status: 'Active',
-    dateCreated: '2026-07-01'
+    dateCreated: '2026-07-01',
+    password: '#Deemainzino1'
   },
   {
     id: 'user-3',
@@ -166,7 +170,8 @@ export const DEFAULT_USERS: AdminUser[] = [
     phone: '+1 (555) 987-6543',
     address: 'SpaceX HQ, Hawthorne, CA',
     status: 'Active',
-    dateCreated: '2026-06-15'
+    dateCreated: '2026-06-15',
+    password: 'password123'
   },
   {
     id: 'user-4',
@@ -175,7 +180,8 @@ export const DEFAULT_USERS: AdminUser[] = [
     phone: '+1 (555) 123-4567',
     address: 'Mars Launch Site, Boca Chica, TX',
     status: 'Suspended',
-    dateCreated: '2026-07-05'
+    dateCreated: '2026-07-05',
+    password: 'password123'
   }
 ];
 
@@ -196,28 +202,7 @@ export const DEFAULT_ANNOUNCEMENTS: Announcement[] = [
 ];
 
 // Default withdrawals
-export const DEFAULT_WITHDRAWALS: WithdrawalRequest[] = [
-  {
-    id: 'with-1',
-    userEmail: 'elon@tesla.com',
-    amount: 1500,
-    paymentMethod: 'USDT (TRC20)',
-    addressDetails: 'TX9ElonWithdrawAddress1234567xZ',
-    date: '2026-07-10 11:30',
-    status: 'Pending',
-    referenceNo: 'MSK-99210-WTH'
-  },
-  {
-    id: 'with-2',
-    userEmail: 'kordacharityfoundation@gmail.com',
-    amount: 500,
-    paymentMethod: 'Bitcoin (BTC)',
-    addressDetails: '1KordaBtcWithdrawAddress992817xS',
-    date: '2026-07-09 15:45',
-    status: 'Approved',
-    referenceNo: 'MSK-10293-WTH'
-  }
-];
+export const DEFAULT_WITHDRAWALS: WithdrawalRequest[] = [];
 
 // Default payment methods config
 export const DEFAULT_PAYMENT_CONFIG: PaymentMethodsConfig = {
@@ -298,92 +283,13 @@ export interface SystemSettings {
   referralProgramOpen: boolean;
 }
 
-export const DEFAULT_TICKETS: SupportTicket[] = [
-  {
-    id: 'tick-1',
-    userEmail: 'elon@tesla.com',
-    userName: 'Elon Musk',
-    subject: 'Optimus Joint Calibration Delay',
-    category: 'Technical',
-    priority: 'High',
-    message: 'My kinetic node seems to have registered a brief calibration latency during last night’s sub-orbital testing. Please verify connection bounds.',
-    date: '2026-07-11 14:22',
-    status: 'Pending',
-    replies: [
-      {
-        id: 'rep-1',
-        sender: 'admin',
-        senderName: 'System Core Admin',
-        message: 'Hello Elon. We have requested Hawthorn telemetry engineers to examine the sub-orbital routing. Latency should clear on next epoch.',
-        date: '2026-07-11 16:10'
-      }
-    ]
-  }
-];
+export const DEFAULT_TICKETS: SupportTicket[] = [];
 
-export const DEFAULT_CHATS: ChatMessage[] = [
-  {
-    id: 'chat-1',
-    userEmail: 'elon@tesla.com',
-    userName: 'Elon Musk',
-    sender: 'user',
-    message: 'Is the Colossus GPU Cluster mesh active right now?',
-    date: '2026-07-12 09:30'
-  },
-  {
-    id: 'chat-2',
-    userEmail: 'elon@tesla.com',
-    userName: 'System Core Admin',
-    sender: 'admin',
-    message: 'Yes Elon! 100,000 liquid-cooled H100 GPUs are running optimally. Daily yield compounds on schedule.',
-    date: '2026-07-12 09:31'
-  }
-];
+export const DEFAULT_CHATS: ChatMessage[] = [];
 
-export const DEFAULT_ACTIVITIES: ActivityLog[] = [
-  {
-    id: 'log-1',
-    userEmail: 'elon@tesla.com',
-    action: 'Invested $5,000 into Falcon Heavy Rocket Thrust',
-    date: '2026-07-11 10:14',
-    type: 'User'
-  },
-  {
-    id: 'log-2',
-    userEmail: 'kordacharityfoundation@gmail.com',
-    action: 'Withdrew $500 via Bitcoin',
-    date: '2026-07-10 18:25',
-    type: 'User'
-  },
-  {
-    id: 'log-3',
-    userEmail: 'admin@muskinvestment.com',
-    action: 'Modified USDT ERC20 Deposit Address',
-    date: '2026-07-12 01:10',
-    type: 'Admin'
-  }
-];
+export const DEFAULT_ACTIVITIES: ActivityLog[] = [];
 
-export const DEFAULT_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'not-1',
-    userEmail: 'elon@tesla.com',
-    title: 'Account Secured Successfully',
-    message: 'Welcome to Musk Investments. Your investor node is fully certified.',
-    date: '2026-07-11 09:00',
-    isRead: false,
-    type: 'general'
-  },
-  {
-    id: 'not-2',
-    userEmail: 'kordacharityfoundation@gmail.com',
-    title: 'Withdrawal Request Approved',
-    message: 'Your $500 Bitcoin withdrawal reference MSK-10293-WTH is now complete.',
-    date: '2026-07-10 19:30',
-    isRead: true,
-    type: 'withdrawal_approved'
-  }
-];
+export const DEFAULT_NOTIFICATIONS: NotificationItem[] = [];
 
 export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   websiteName: 'Musk Investment',

@@ -78,11 +78,7 @@ export default function UserDashboard({ user, onNavigateToPlans }: UserDashboard
     if (savedDeps) {
       try {
         const parsed = JSON.parse(savedDeps);
-        userDeps = parsed.filter((d: any) => d.userEmail === user.email || d.email === user.email);
-        if (userDeps.length === 0 && parsed.length > 0) {
-          // Fallback demo matching
-          userDeps = parsed;
-        }
+        userDeps = parsed.filter((d: any) => (d.userEmail && d.userEmail.toLowerCase() === user.email.toLowerCase()) || (d.email && d.email.toLowerCase() === user.email.toLowerCase()));
       } catch (e) {
         userDeps = [];
       }
@@ -90,7 +86,7 @@ export default function UserDashboard({ user, onNavigateToPlans }: UserDashboard
     setDeposits(userDeps);
 
     // Sync everything else
-    setWithdrawals(getSavedWithdrawals());
+    setWithdrawals(getSavedWithdrawals().filter(w => w.userEmail.toLowerCase() === user.email.toLowerCase()));
     setTickets(getSavedTickets().filter(t => t.userEmail === user.email));
     setChatMessages(getSavedChats().filter(c => c.userEmail === user.email));
     setActivities(getSavedActivities().filter(a => a.userEmail === user.email));
@@ -405,11 +401,8 @@ export default function UserDashboard({ user, onNavigateToPlans }: UserDashboard
         {[
           { id: 'overview', label: 'Overview', icon: TrendingUp },
           { id: 'withdraw', label: 'Withdrawal Center', icon: Wallet },
-          { id: 'support', label: 'Help Desk & Chat', icon: MessageSquare },
-          { id: 'referrals', label: 'Referral Program', icon: Share2 },
           { id: 'notifications', label: `Notifications (${notifications.filter(n=>!n.isRead).length})`, icon: Bell },
           { id: 'profile', label: 'Profile Settings', icon: User },
-          { id: 'activity', label: 'Logs', icon: Activity },
         ].map((tab) => {
           const IconComponent = tab.icon;
           return (
@@ -505,18 +498,12 @@ export default function UserDashboard({ user, onNavigateToPlans }: UserDashboard
               {/* Quick Actions Shortcuts */}
               <div className="bg-[#0b0826]/40 rounded-xl border border-purple-500/10 p-4 text-left">
                 <p className="text-xs font-mono font-bold text-purple-400 uppercase tracking-wider mb-3">Quick Interactive Commands</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <button onClick={onNavigateToPlans} className="bg-purple-600/15 hover:bg-purple-600/35 text-purple-300 font-bold py-2.5 px-3 rounded-lg text-xs flex items-center justify-center gap-2 border border-purple-500/20 transition-all min-h-[40px]">
-                    <Plus className="h-3.5 w-3.5" /> Make Deposit
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={onNavigateToPlans} className="bg-purple-600/15 hover:bg-purple-600/35 text-purple-300 font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 border border-purple-500/20 transition-all min-h-[44px]">
+                    <Plus className="h-4 w-4" /> Make Deposit
                   </button>
-                  <button onClick={() => setActiveTab('withdraw')} className="bg-indigo-600/15 hover:bg-indigo-600/35 text-indigo-300 font-bold py-2.5 px-3 rounded-lg text-xs flex items-center justify-center gap-2 border border-indigo-500/20 transition-all min-h-[40px]">
-                    <Wallet className="h-3.5 w-3.5" /> Withdraw Yields
-                  </button>
-                  <button onClick={() => setActiveTab('support')} className="bg-sky-600/15 hover:bg-sky-600/35 text-sky-300 font-bold py-2.5 px-3 rounded-lg text-xs flex items-center justify-center gap-2 border border-sky-500/20 transition-all min-h-[40px]">
-                    <MessageSquare className="h-3.5 w-3.5" /> Create Ticket
-                  </button>
-                  <button onClick={() => setActiveTab('referrals')} className="bg-emerald-600/15 hover:bg-emerald-600/35 text-emerald-300 font-bold py-2.5 px-3 rounded-lg text-xs flex items-center justify-center gap-2 border border-emerald-500/20 transition-all min-h-[40px]">
-                    <Share2 className="h-3.5 w-3.5" /> Affiliates
+                  <button onClick={() => setActiveTab('withdraw')} className="bg-indigo-600/15 hover:bg-indigo-600/35 text-indigo-300 font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 border border-indigo-500/20 transition-all min-h-[44px]">
+                    <Wallet className="h-4 w-4" /> Withdraw Yields
                   </button>
                 </div>
               </div>

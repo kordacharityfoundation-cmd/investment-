@@ -4,13 +4,15 @@ import Hero from './components/Hero';
 import Stats from './components/Stats';
 import About from './components/About';
 import HowItWorks from './components/HowItWorks';
+import Plans from './components/Plans';
+import DepositPage from './components/DepositPage';
 import WelcomeMessage from './components/WelcomeMessage';
 import CallToAction from './components/CallToAction';
 import Footer from './components/Footer';
 import AuthPortal from './components/AuthPortal';
 import UserDashboard from './components/UserDashboard';
 import AdminDashboard from './components/AdminDashboard';
-import { UserState } from './types';
+import { UserState, InvestmentPlan } from './types';
 import { 
   Globe, LayoutDashboard, Settings, Mail, Lock, ShieldAlert, ArrowLeft, Eye, EyeOff 
 } from 'lucide-react';
@@ -29,7 +31,8 @@ export default function App() {
     return null;
   });
 
-  const [currentView, setCurrentView] = useState<'landing' | 'dashboard'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'deposit'>('landing');
+  const [selectedPlanForDeposit, setSelectedPlanForDeposit] = useState<InvestmentPlan | null>(null);
 
   // Admin routing state
   const [isAdminRoute, setIsAdminRoute] = useState(() => {
@@ -133,7 +136,7 @@ export default function App() {
     }
   };
 
-  const handleSetView = (view: 'landing' | 'dashboard') => {
+  const handleSetView = (view: 'landing' | 'dashboard' | 'deposit') => {
     setCurrentView(view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -151,16 +154,38 @@ export default function App() {
   const handleAdminLoginSubmit = (e: FormEvent) => {
     e.preventDefault();
     setAdminError('');
-    const isValidEmail = adminEmail === 'admin@muskinvestment.com' || adminEmail === 'kordacharityfoundation@gmail.com';
-    const isValidPassword = adminPassword === 'admin123' || adminPassword === '#Deemainzino1';
 
-    if (isValidEmail && isValidPassword) {
+    // Query registered users dynamically
+    const savedUsersRaw = localStorage.getItem('musk_users');
+    let usersList = [];
+    if (savedUsersRaw) {
+      try {
+        usersList = JSON.parse(savedUsersRaw);
+      } catch (err) {}
+    }
+
+    // Check if the user is in the database with matching email and password
+    const matchedUser = usersList.find((u: any) => 
+      u.email.toLowerCase() === adminEmail.toLowerCase() && 
+      u.password === adminPassword
+    );
+
+    const isHardcodedAdmin = (adminEmail.toLowerCase() === 'admin@muskinvestment.com' && adminPassword === 'admin123') ||
+                             (adminEmail.toLowerCase() === 'kordacharityfoundation@gmail.com' && adminPassword === '#Deemainzino1');
+
+    const isAdminUser = isHardcodedAdmin || (matchedUser && (
+      matchedUser.name.toLowerCase().includes('admin') || 
+      matchedUser.email.toLowerCase().includes('admin')
+    ));
+
+    if (isAdminUser) {
       setAdminLoading(true);
       setTimeout(() => {
         setAdminLoading(false);
+        const adminName = matchedUser ? matchedUser.name : (adminEmail === 'kordacharityfoundation@gmail.com' ? 'Lead Administrator' : 'Root Administrator');
         const loggedAdmin: UserState = {
           isLoggedIn: true,
-          name: adminEmail === 'kordacharityfoundation@gmail.com' ? 'Lead Administrator' : 'Root Administrator',
+          name: adminName,
           email: adminEmail,
           avatarSeed: 'ADMIN'
         };
@@ -345,6 +370,15 @@ export default function App() {
             <About />
             
             <HowItWorks />
+
+            <Plans
+              user={user}
+              onOpenAuth={handleOpenAuth}
+              onSelectPlan={(plan) => {
+                setSelectedPlanForDeposit(plan);
+                handleSetView('deposit');
+              }}
+            />
             
             <WelcomeMessage />
             
@@ -352,11 +386,22 @@ export default function App() {
               onOpenAuth={handleOpenAuth}
             />
           </>
-        ) : (
+        ) : currentView === 'dashboard' ? (
           <div className="pt-24 pb-12">
             <UserDashboard 
               user={user!} 
-              onNavigateToPlans={() => handleSetView('landing')} 
+              onNavigateToPlans={() => {
+                setSelectedPlanForDeposit(null);
+                handleSetView('deposit');
+              }} 
+            />
+          </div>
+        ) : (
+          <div className="pt-24 pb-12">
+            <DepositPage 
+              user={user!} 
+              initialSelectedPlan={selectedPlanForDeposit} 
+              onBackToDashboard={() => handleSetView('dashboard')} 
             />
           </div>
         )}
