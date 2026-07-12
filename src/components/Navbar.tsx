@@ -115,19 +115,6 @@ export default function Navbar({ user, onLogout, onOpenAuth, currentView, onChan
                   <LayoutDashboard className="h-3.5 w-3.5" />
                   <span>Dashboard</span>
                 </button>
-
-                <button
-                  id="switch-to-admin-dashboard-btn"
-                  onClick={() => onChangeView('admin')}
-                  className={`px-3 py-1.5 rounded-lg font-semibold text-[11px] transition-all flex items-center gap-1.5 min-h-[28px] ${
-                    currentView === 'admin'
-                      ? 'bg-red-500/10 text-red-300 border border-red-500/20 shadow-sm'
-                      : 'text-gray-400 hover:text-white border border-transparent'
-                  }`}
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                  <span>Admin</span>
-                </button>
               </div>
             )}
 
@@ -208,7 +195,7 @@ export default function Navbar({ user, onLogout, onOpenAuth, currentView, onChan
                   {user?.isLoggedIn ? (
                     <div className="flex flex-col gap-3">
                       {/* Premium Mobile View Switcher */}
-                      <div className="grid grid-cols-3 gap-1 bg-white/5 border border-white/10 rounded-xl p-1">
+                      <div className="grid grid-cols-2 gap-1 bg-white/5 border border-white/10 rounded-xl p-1">
                         <button
                           onClick={() => { onChangeView('landing'); setIsOpen(false); }}
                           className={`py-2 rounded-lg font-semibold text-[11px] transition-all flex flex-col items-center justify-center gap-1 ${
@@ -231,18 +218,6 @@ export default function Navbar({ user, onLogout, onOpenAuth, currentView, onChan
                         >
                           <LayoutDashboard className="h-4 w-4" />
                           <span>Dashboard</span>
-                        </button>
-                        <button
-                          id="switch-to-admin-dashboard-btn-mobile"
-                          onClick={() => { onChangeView('admin'); setIsOpen(false); }}
-                          className={`py-2 rounded-lg font-semibold text-[11px] transition-all flex flex-col items-center justify-center gap-1 ${
-                            currentView === 'admin' 
-                              ? 'bg-red-500/10 text-red-300 border border-red-500/20' 
-                              : 'text-gray-400 hover:text-white'
-                          }`}
-                        >
-                          <Settings className="h-4 w-4" />
-                          <span>Admin</span>
                         </button>
                       </div>
 

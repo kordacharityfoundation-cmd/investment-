@@ -5,7 +5,7 @@ import {
   Search, CheckCircle2, ShieldAlert, DollarSign, Wallet, FileText, 
   Bell, AlertCircle, RefreshCw, Key, Image, Banknote, ShieldCheck, 
   Info, Sparkles, UserCheck, UserMinus, Clock, MessageSquare, HelpCircle,
-  Activity, Settings
+  Activity, Settings, LogOut
 } from 'lucide-react';
 import { 
   getSavedUsers, getSavedWithdrawals, getSavedPlans, getSavedAnnouncements,
@@ -16,7 +16,7 @@ import {
 import { InvestmentPlan } from '../types';
 import { DepositTransaction } from './Plans';
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) {
   // Database states
   const [usersList, setUsersList] = useState<AdminUser[]>([]);
   const [depositsList, setDepositsList] = useState<DepositTransaction[]>([]);
@@ -501,13 +501,25 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        <button
-          onClick={syncDatabase}
-          className="flex items-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 px-4 py-2.5 text-xs font-bold border border-white/10 transition-all min-h-[40px]"
-        >
-          <RefreshCw className="h-4 w-4 text-purple-400" />
-          <span>Sync Ledger State</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={syncDatabase}
+            className="flex items-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 px-4 py-2.5 text-xs font-bold border border-white/10 transition-all min-h-[40px]"
+          >
+            <RefreshCw className="h-4 w-4 text-purple-400" />
+            <span>Sync Ledger State</span>
+          </button>
+          
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 px-4 py-2.5 text-xs font-bold border border-red-500/20 text-red-400 transition-all min-h-[40px]"
+            >
+              <LogOut className="h-4 w-4 text-red-400" />
+              <span>Term Secure Logout</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Navigation tab bar for administrator */}
