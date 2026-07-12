@@ -1,0 +1,6 @@
+{
+  "name": "Musk Investment Platform",
+  "description": "A professional, modern investment platform landing page with a dark futuristic design inspired by premium fintech and technology.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
