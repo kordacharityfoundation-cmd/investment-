@@ -386,11 +386,11 @@ export const DEFAULT_NOTIFICATIONS: NotificationItem[] = [
 ];
 
 export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
-  websiteName: 'Musk Wealth',
+  websiteName: 'Musk Investment',
   supportEmail: 'support@muskinvestment.com',
   supportPhone: '+1 (800) 555-MUSK',
   companyAddress: 'Starbase Launch Facility, Boca Chica, Texas, USA',
-  footerText: '© 2026 Musk Wealth. Designed for professional staking and high-throughput technological asset compounding. Backed by automated aerospace energy allocation pools.',
+  footerText: '© 2026 Musk Investment. Designed for professional staking and high-throughput technological asset compounding. Backed by automated aerospace energy allocation pools.',
   maintenanceMode: false,
   registrationOpen: true,
   depositOpen: true,
