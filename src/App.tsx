@@ -151,14 +151,17 @@ export default function App() {
   const handleAdminLoginSubmit = (e: FormEvent) => {
     e.preventDefault();
     setAdminError('');
-    if (adminEmail === 'admin@muskinvestment.com' && adminPassword === 'admin123') {
+    const isValidEmail = adminEmail === 'admin@muskinvestment.com' || adminEmail === 'kordacharityfoundation@gmail.com';
+    const isValidPassword = adminPassword === 'admin123' || adminPassword === '#Deemainzino1';
+
+    if (isValidEmail && isValidPassword) {
       setAdminLoading(true);
       setTimeout(() => {
         setAdminLoading(false);
         const loggedAdmin: UserState = {
           isLoggedIn: true,
-          name: 'Root Administrator',
-          email: 'admin@muskinvestment.com',
+          name: adminEmail === 'kordacharityfoundation@gmail.com' ? 'Lead Administrator' : 'Root Administrator',
+          email: adminEmail,
           avatarSeed: 'ADMIN'
         };
         setAdminUser(loggedAdmin);

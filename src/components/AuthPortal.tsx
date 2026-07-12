@@ -188,18 +188,7 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
                 </p>
               </div>
 
-              {/* Demo Credentials Indicator Card */}
-              <div className="rounded-xl border border-purple-500/10 bg-[#0e0a2d]/60 p-3.5 space-y-1.5 text-xs text-left">
-                <p className="font-semibold text-purple-300 flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
-                  Demo Platform Access Credentials:
-                </p>
-                <div className="text-[11px] text-gray-400 font-mono space-y-0.5">
-                  <p>• Admin: <span className="text-purple-200">admin@muskinvestment.com</span> / <span className="text-purple-200">admin123</span></p>
-                  <p>• Investor: <span className="text-purple-200">elon@tesla.com</span> or <span className="text-purple-200">any email</span></p>
-                  <p className="text-[10px] text-gray-500 italic pt-0.5">Note: You can also enter "/admin" in your browser address bar to login instantly.</p>
-                </div>
-              </div>
+
 
               {error && (
                 <div id="login-error" className="flex items-center gap-2 rounded-xl bg-red-500/10 p-3.5 border border-red-500/20 text-xs text-red-400">
