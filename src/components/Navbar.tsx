@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, Rocket, LogOut, ChevronRight, User } from 'lucide-react';
+import { Menu, X, Rocket, LogOut, ChevronRight, User, Globe, LayoutDashboard, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserState } from '../types';
 
@@ -7,9 +7,11 @@ interface NavbarProps {
   user: UserState | null;
   onLogout: () => void;
   onOpenAuth: (tab: 'login' | 'register') => void;
+  currentView: 'landing' | 'dashboard' | 'admin';
+  onChangeView: (view: 'landing' | 'dashboard' | 'admin') => void;
 }
 
-export default function Navbar({ user, onLogout, onOpenAuth }: NavbarProps) {
+export default function Navbar({ user, onLogout, onOpenAuth, currentView, onChangeView }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -31,9 +33,19 @@ export default function Navbar({ user, onLogout, onOpenAuth }: NavbarProps) {
 
   const handleNavClick = (href: string) => {
     setIsOpen(false);
-    const element = document.querySelector(href);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
+    if (currentView !== 'landing') {
+      onChangeView('landing');
+      setTimeout(() => {
+        const element = document.querySelector(href);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 150);
+    } else {
+      const element = document.querySelector(href);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   };
 
@@ -62,35 +74,78 @@ export default function Navbar({ user, onLogout, onOpenAuth }: NavbarProps) {
           </a>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
-            <div className="flex items-center gap-6">
+          <div className="hidden md:flex items-center gap-6 lg:gap-8">
+            <div className="flex items-center gap-4 lg:gap-6">
               {navItems.map((item) => (
                 <a
                   key={item.name}
                   href={item.href}
                   onClick={(e) => { e.preventDefault(); handleNavClick(item.href); }}
-                  className="text-sm font-medium text-gray-300 hover:text-purple-400 transition-colors duration-200"
+                  className="text-xs lg:text-sm font-medium text-gray-300 hover:text-purple-400 transition-colors duration-200"
                 >
                   {item.name}
                 </a>
               ))}
             </div>
 
+            {/* Premium Integrated View Switcher (Only visible when user is logged in) */}
+            {user?.isLoggedIn && (
+              <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1 shadow-inner">
+                <button
+                  onClick={() => onChangeView('landing')}
+                  className={`px-3 py-1.5 rounded-lg font-semibold text-[11px] transition-all flex items-center gap-1.5 min-h-[28px] ${
+                    currentView === 'landing'
+                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30 shadow-sm'
+                      : 'text-gray-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <Globe className="h-3.5 w-3.5" />
+                  <span>Website</span>
+                </button>
+                
+                <button
+                  id="switch-to-user-dashboard-btn"
+                  onClick={() => onChangeView('dashboard')}
+                  className={`px-3 py-1.5 rounded-lg font-semibold text-[11px] transition-all flex items-center gap-1.5 min-h-[28px] ${
+                    currentView === 'dashboard'
+                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30 shadow-sm'
+                      : 'text-gray-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <LayoutDashboard className="h-3.5 w-3.5" />
+                  <span>Dashboard</span>
+                </button>
+
+                <button
+                  id="switch-to-admin-dashboard-btn"
+                  onClick={() => onChangeView('admin')}
+                  className={`px-3 py-1.5 rounded-lg font-semibold text-[11px] transition-all flex items-center gap-1.5 min-h-[28px] ${
+                    currentView === 'admin'
+                      ? 'bg-red-500/10 text-red-300 border border-red-500/20 shadow-sm'
+                      : 'text-gray-400 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  <span>Admin</span>
+                </button>
+              </div>
+            )}
+
             {/* CTA Buttons or User State */}
             <div className="flex items-center gap-4">
               {user?.isLoggedIn ? (
-                <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-full pl-3 pr-4 py-1.5">
-                  <div className="h-7 w-7 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center border border-white/20 text-xs font-bold text-white">
-                    {user.name.charAt(0)}
+                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-full pl-2 pr-3 py-1">
+                  <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center border border-white/20 text-[10px] font-bold text-white">
+                    {user.name.charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-xs font-semibold text-gray-200">{user.name}</span>
+                  <span className="text-[11px] font-semibold text-gray-200 max-w-[80px] truncate">{user.name}</span>
                   <button
                     id="logout-btn-desktop"
                     onClick={onLogout}
                     title="Log Out"
-                    className="text-gray-400 hover:text-red-400 p-1 rounded-full transition-all"
+                    className="text-gray-400 hover:text-red-400 p-0.5 rounded-full transition-all"
                   >
-                    <LogOut className="h-4 w-4" />
+                    <LogOut className="h-3.5 w-3.5" />
                   </button>
                 </div>
               ) : (
@@ -152,9 +207,48 @@ export default function Navbar({ user, onLogout, onOpenAuth }: NavbarProps) {
                 <div className="pt-4 flex flex-col gap-3">
                   {user?.isLoggedIn ? (
                     <div className="flex flex-col gap-3">
+                      {/* Premium Mobile View Switcher */}
+                      <div className="grid grid-cols-3 gap-1 bg-white/5 border border-white/10 rounded-xl p-1">
+                        <button
+                          onClick={() => { onChangeView('landing'); setIsOpen(false); }}
+                          className={`py-2 rounded-lg font-semibold text-[11px] transition-all flex flex-col items-center justify-center gap-1 ${
+                            currentView === 'landing' 
+                              ? 'bg-purple-600/20 text-purple-300 border border-purple-500/20' 
+                              : 'text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          <Globe className="h-4 w-4" />
+                          <span>Website</span>
+                        </button>
+                        <button
+                          id="switch-to-user-dashboard-btn-mobile"
+                          onClick={() => { onChangeView('dashboard'); setIsOpen(false); }}
+                          className={`py-2 rounded-lg font-semibold text-[11px] transition-all flex flex-col items-center justify-center gap-1 ${
+                            currentView === 'dashboard' 
+                              ? 'bg-purple-600/20 text-purple-300 border border-purple-500/20' 
+                              : 'text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          <LayoutDashboard className="h-4 w-4" />
+                          <span>Dashboard</span>
+                        </button>
+                        <button
+                          id="switch-to-admin-dashboard-btn-mobile"
+                          onClick={() => { onChangeView('admin'); setIsOpen(false); }}
+                          className={`py-2 rounded-lg font-semibold text-[11px] transition-all flex flex-col items-center justify-center gap-1 ${
+                            currentView === 'admin' 
+                              ? 'bg-red-500/10 text-red-300 border border-red-500/20' 
+                              : 'text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          <Settings className="h-4 w-4" />
+                          <span>Admin</span>
+                        </button>
+                      </div>
+
                       <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
                         <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center border border-white/20 text-sm font-bold text-white">
-                          {user.name.charAt(0)}
+                          {user.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-gray-200">{user.name}</p>

@@ -87,16 +87,16 @@ export default function Hero({ onOpenAuth, onScrollToSection }: HeroProps) {
               onClick={() => onOpenAuth('register')}
               className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 px-7 py-4 text-base font-semibold text-white shadow-xl shadow-purple-500/25 transition-all duration-250 active:scale-95 group"
             >
-              <span>Register Now</span>
+              <span>Register</span>
               <ArrowRight className="h-5 w-5 text-purple-200 group-hover:translate-x-1 transition-transform" />
             </button>
 
             <button
-              id="hero-learn-more-btn"
-              onClick={() => onScrollToSection('#about')}
+              id="hero-signup-btn"
+              onClick={() => onOpenAuth('register')}
               className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 px-7 py-4 text-base font-semibold text-white transition-all duration-250 active:scale-95"
             >
-              <span>Learn More</span>
+              <span>Sign Up</span>
             </button>
           </motion.div>
         </div>

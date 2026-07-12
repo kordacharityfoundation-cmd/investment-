@@ -33,17 +33,16 @@ export default function CallToAction({ onOpenAuth }: CTAProps) {
             onClick={() => onOpenAuth('register')}
             className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 px-8 py-4 text-base font-semibold text-white shadow-xl shadow-purple-500/20 active:scale-95 transition-all duration-200 group"
           >
-            <span>Register Account</span>
+            <span>Register</span>
             <ArrowRight className="h-5 w-5 text-purple-200 group-hover:translate-x-1 transition-transform" />
           </button>
 
           <button
-            id="cta-login-btn"
-            onClick={() => onOpenAuth('login')}
+            id="cta-signup-btn"
+            onClick={() => onOpenAuth('register')}
             className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 px-8 py-4 text-base font-semibold text-white transition-all duration-200 active:scale-95"
           >
-            <LogIn className="h-4.5 w-4.5 text-gray-400" />
-            <span>Login</span>
+            <span>Sign Up</span>
           </button>
         </div>
 
