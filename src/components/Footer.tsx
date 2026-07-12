@@ -10,7 +10,6 @@ export default function Footer({ onScrollToSection, onOpenAuth }: FooterProps) {
   const links = [
     { name: 'Home', href: '#home', type: 'scroll' },
     { name: 'About', href: '#about', type: 'scroll' },
-    { name: 'Plans', href: '#plans', type: 'scroll' },
     { name: 'Register', tab: 'register', type: 'modal' },
     { name: 'Login', tab: 'login', type: 'modal' },
   ];

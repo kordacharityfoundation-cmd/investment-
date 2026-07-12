@@ -3,7 +3,6 @@ import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Stats from './components/Stats';
 import About from './components/About';
-import Plans from './components/Plans';
 import HowItWorks from './components/HowItWorks';
 import WelcomeMessage from './components/WelcomeMessage';
 import CallToAction from './components/CallToAction';
@@ -341,11 +340,6 @@ export default function App() {
             <Stats />
             
             <About />
-            
-            <Plans
-              user={user}
-              onOpenAuth={handleOpenAuth}
-            />
             
             <HowItWorks />
             

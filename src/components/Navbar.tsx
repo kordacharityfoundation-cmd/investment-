@@ -27,7 +27,6 @@ export default function Navbar({ user, onLogout, onOpenAuth, currentView, onChan
   const navItems = [
     { name: 'Home', href: '#home' },
     { name: 'About', href: '#about' },
-    { name: 'Investment Plans', href: '#plans' },
     { name: 'How It Works', href: '#how-it-works' },
   ];
 
