@@ -7,8 +7,8 @@ interface NavbarProps {
   user: UserState | null;
   onLogout: () => void;
   onOpenAuth: (tab: 'login' | 'register') => void;
-  currentView: 'landing' | 'dashboard' | 'admin';
-  onChangeView: (view: 'landing' | 'dashboard' | 'admin') => void;
+  currentView: 'landing' | 'dashboard' | 'deposit' | 'admin';
+  onChangeView: (view: 'landing' | 'dashboard' | 'deposit' | 'admin') => void;
 }
 
 export default function Navbar({ user, onLogout, onOpenAuth, currentView, onChangeView }: NavbarProps) {

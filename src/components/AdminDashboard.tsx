@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Users, TrendingUp, Download, Upload, Trash2, Edit2, Plus, Check, X, 
+  Users, TrendingUp, Download, Upload, Trash2, Edit2, Plus, Check, X, Menu,
   Search, CheckCircle2, ShieldAlert, DollarSign, Wallet, FileText, 
   Bell, AlertCircle, RefreshCw, Key, Image, Banknote, ShieldCheck, 
   Info, Sparkles, UserCheck, UserMinus, Clock, MessageSquare, HelpCircle,
@@ -34,6 +34,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
 
   // Active Management Tab
   const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'deposits' | 'withdrawals' | 'plans' | 'payments' | 'announcements' | 'tickets' | 'settings' | 'audits'>('stats');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Search & Filters
   const [userSearch, setUserSearch] = useState('');
@@ -464,160 +465,233 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
   const approvedDepositsCount = depositsList.filter(d => d.status === 'Approved').length;
   const totalWithdrawalsSum = withdrawalsList.filter(w => w.status === 'Approved').reduce((acc, curr) => acc + curr.amount, 0);
 
+  const sidebarItems = [
+    { id: 'stats', label: 'Overview Stats', icon: TrendingUp },
+    { id: 'users', label: 'Manage Users', icon: Users, badge: usersList.length },
+    { id: 'deposits', label: 'Deposits Ledger', icon: Download, badge: depositsList.filter(d => d.status === 'Pending').length },
+    { id: 'withdrawals', label: 'Withdrawals Ledger', icon: Upload, badge: withdrawalsList.filter(w => w.status === 'Pending').length },
+    { id: 'plans', label: 'Plans Editor', icon: FileText, badge: plansList.length },
+    { id: 'payments', label: 'Gateways & QRs', icon: Key },
+    { id: 'announcements', label: 'Announcements', icon: Bell, badge: announcementsList.length },
+    { id: 'tickets', label: 'Support Tickets', icon: MessageSquare, badge: ticketsList.filter(t => t.status === 'Pending').length },
+    { id: 'settings', label: 'Website Settings', icon: Settings },
+    { id: 'audits', label: 'Audit Logs', icon: Activity, badge: activitiesList.length },
+  ];
+
   return (
-    <div id="admin-dashboard-container" className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8 text-left text-gray-200">
+    <div id="admin-dashboard-wrapper" className="min-h-screen text-gray-200">
       
-      {/* Admin Notice Area */}
-      <AnimatePresence>
-        {notice.text && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-6 right-6 z-50 rounded-xl px-5 py-4 border shadow-2xl flex items-center gap-3 ${
-              notice.type === 'success' 
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                : 'bg-red-500/10 border-red-500/30 text-red-400'
-            }`}
-          >
-            {notice.type === 'success' ? <CheckCircle2 className="h-5 w-5 shrink-0" /> : <AlertCircle className="h-5 w-5 shrink-0" />}
-            <span className="text-sm font-semibold">{notice.text}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Mobile Sticky Header Bar */}
+      <div className="md:hidden flex items-center justify-between bg-[#040212]/95 backdrop-blur-md border-b border-purple-500/10 px-4 py-3 sticky top-0 z-40">
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="p-2 -ml-2 rounded-xl bg-purple-950/20 border border-purple-500/10 text-purple-300 hover:text-white hover:bg-purple-600/20 active:scale-95 transition-all flex items-center justify-center"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <span className="text-xs font-mono font-black tracking-wider uppercase text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-lg">
+          Secure Admin Desk
+        </span>
+        <button 
+          onClick={() => syncDatabase()}
+          className="relative p-2 rounded-xl text-gray-400 hover:text-white"
+        >
+          <RefreshCw className="h-5 w-5" />
+        </button>
+      </div>
 
-      {/* Admin Control Center Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-xs font-mono font-bold tracking-widest text-red-400 uppercase">Secure Root Admin Hub</span>
+      <div className="flex flex-col md:flex-row gap-6 max-w-7xl mx-auto px-4 sm:px-6 py-6 text-left">
+        {/* Desktop Sidebar Panel */}
+        <div className="hidden md:block w-64 shrink-0">
+          <div className="sticky top-24 bg-[#05041a]/60 backdrop-blur-md rounded-2xl border border-purple-500/10 p-4 space-y-4 shadow-xl shadow-black/40">
+            <div className="px-2 py-1 border-b border-white/5 pb-3">
+              <h3 className="text-xs font-mono font-black tracking-widest text-red-400 uppercase">
+                Admin Hub
+              </h3>
+              <p className="text-[10px] text-gray-500 mt-1">Select operation node</p>
+            </div>
+            
+            <nav className="space-y-1.5 max-h-[70vh] overflow-y-auto pr-1">
+              {sidebarItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id as any)}
+                    className={`w-full px-3 py-2 rounded-xl text-[11px] font-bold transition-all flex items-center justify-between border ${
+                      isActive 
+                        ? 'bg-purple-600/20 text-purple-300 border-purple-500/30 shadow-sm shadow-purple-950/20' 
+                        : 'bg-transparent text-gray-400 border-transparent hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-purple-400' : 'text-gray-500'}`} />
+                      <span>{item.label}</span>
+                    </div>
+                    {item.badge !== undefined && item.badge > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-md text-[9px] font-mono bg-purple-500/20 border border-purple-500/30 text-purple-400 font-black">
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Administrative Control Center
-          </h2>
-          <p className="text-xs sm:text-sm text-gray-400 font-light">
-            Monitor, verify, approve deposits, adjust contract specifications, manage user lists, and post bulletins.
-          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={syncDatabase}
-            className="flex items-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 px-4 py-2.5 text-xs font-bold border border-white/10 transition-all min-h-[40px]"
-          >
-            <RefreshCw className="h-4 w-4 text-purple-400" />
-            <span>Sync Ledger State</span>
-          </button>
-          
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              className="flex items-center gap-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 px-4 py-2.5 text-xs font-bold border border-red-500/20 text-red-400 transition-all min-h-[40px]"
-            >
-              <LogOut className="h-4 w-4 text-red-400" />
-              <span>Term Secure Logout</span>
-            </button>
+        {/* Mobile Drawer Sidebar */}
+        <AnimatePresence>
+          {isSidebarOpen && (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsSidebarOpen(false)}
+                className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 md:hidden"
+              />
+
+              {/* Drawer Content */}
+              <motion.div
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed top-0 left-0 bottom-0 w-72 bg-[#040212] border-r border-purple-500/10 z-50 p-5 flex flex-col md:hidden text-left"
+              >
+                {/* Drawer Header */}
+                <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-white tracking-tight">Admin Operations</h3>
+                    <p className="text-[10px] text-red-400 font-mono">System Core Hub</p>
+                  </div>
+                  <button
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="p-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white flex items-center justify-center"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Drawer Items List */}
+                <nav className="space-y-1.5 flex-1 overflow-y-auto pr-1">
+                  {sidebarItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setActiveTab(item.id as any);
+                          setIsSidebarOpen(false);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className={`w-full px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between border ${
+                          isActive 
+                            ? 'bg-purple-600/20 text-purple-300 border-purple-500/30 shadow-md shadow-purple-950/25' 
+                            : 'bg-[#09071f]/40 text-gray-400 border-white/5 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon className={`h-4 w-4 ${isActive ? 'text-purple-400' : 'text-gray-500'}`} />
+                          <span>{item.label}</span>
+                        </div>
+                        {item.badge !== undefined && item.badge > 0 && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-mono bg-purple-500/20 border border-purple-500/30 text-purple-400 font-bold">
+                            {item.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </nav>
+
+                {/* Drawer Footer */}
+                <div className="border-t border-white/5 pt-4 mt-4">
+                  <div className="flex items-center gap-3 bg-black/40 px-3 py-2 rounded-xl border border-white/5">
+                    <ShieldCheck className="h-4 w-4 text-purple-400 shrink-0" />
+                    <div>
+                      <p className="text-[8px] text-gray-500 uppercase tracking-wider font-semibold">Security Shield</p>
+                      <p className="text-[10px] font-bold text-emerald-400 font-mono">System Secure</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </>
           )}
-        </div>
-      </div>
+        </AnimatePresence>
 
-      {/* Navigation tab bar for administrator */}
-      <div className="flex flex-wrap gap-2 border-b border-white/5 pb-2">
-        <button
-          onClick={() => setActiveTab('stats')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all min-h-[40px] ${
-            activeTab === 'stats' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30' : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <TrendingUp className="h-4 w-4" />
-          <span>Overview Stats</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('users')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all min-h-[40px] ${
-            activeTab === 'users' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30' : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <Users className="h-4 w-4" />
-          <span>Manage Users ({usersList.length})</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('deposits')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all min-h-[40px] ${
-            activeTab === 'deposits' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30' : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <Download className="h-4 w-4" />
-          <span>Deposits Ledger ({depositsList.filter(d => d.status === 'Pending').length} Pending)</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('withdrawals')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all min-h-[40px] ${
-            activeTab === 'withdrawals' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30' : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <Upload className="h-4 w-4" />
-          <span>Withdrawals Ledger ({withdrawalsList.filter(w => w.status === 'Pending').length} Pending)</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('plans')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all min-h-[40px] ${
-            activeTab === 'plans' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30' : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <FileText className="h-4 w-4" />
-          <span>Plans Editor ({plansList.length})</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('payments')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all min-h-[40px] ${
-            activeTab === 'payments' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30' : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <Key className="h-4 w-4" />
-          <span>Gateways & QRs</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('announcements')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all min-h-[40px] ${
-            activeTab === 'announcements' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30' : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <Bell className="h-4 w-4" />
-          <span>Announcements ({announcementsList.length})</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('tickets')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all min-h-[40px] ${
-            activeTab === 'tickets' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30' : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <MessageSquare className="h-4 w-4" />
-          <span>Support Tickets ({ticketsList.filter(t => t.status === 'Pending').length} Open)</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all min-h-[40px] ${
-            activeTab === 'settings' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30' : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <Settings className="h-4 w-4" />
-          <span>Website Settings</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('audits')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all min-h-[40px] ${
-            activeTab === 'audits' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30' : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <Activity className="h-4 w-4" />
-          <span>Audit Logs ({activitiesList.length})</span>
-        </button>
-      </div>
+        {/* Right Main Content Panel */}
+        <div className="flex-1 min-w-0 space-y-6">
 
-      {/* Dynamic Tab Views */}
-      <div>
+          {/* Admin Notice Area */}
+          <AnimatePresence>
+            {notice.text && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className={`fixed top-6 right-6 z-50 rounded-xl px-5 py-4 border shadow-2xl flex items-center gap-3 ${
+                  notice.type === 'success' 
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                    : 'bg-red-500/10 border-red-500/30 text-red-400'
+                }`}
+              >
+                {notice.type === 'success' ? <CheckCircle2 className="h-5 w-5 shrink-0" /> : <AlertCircle className="h-5 w-5 shrink-0" />}
+                <span className="text-sm font-semibold">{notice.text}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Admin Control Center Header */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-red-950/10 via-[#0a071d]/60 to-transparent p-5 sm:p-6 rounded-2xl border border-red-500/10">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
+                <span className="text-[10px] font-mono font-bold tracking-widest text-red-400 uppercase">Secure Root Admin Hub</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
+                Administrative Control Center
+              </h2>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400 mt-1">
+                <span>Monitor, verify, approve deposits, adjust contract specifications, manage user lists, and post bulletins.</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={syncDatabase}
+                className="flex items-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 px-4 py-2.5 text-xs font-bold border border-white/10 transition-all min-h-[40px]"
+              >
+                <RefreshCw className="h-4 w-4 text-purple-400" />
+                <span className="hidden sm:inline">Sync Ledger</span>
+              </button>
+              
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="flex items-center gap-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 px-4 py-2.5 text-xs font-bold border border-red-500/20 text-red-400 transition-all min-h-[40px]"
+                >
+                  <LogOut className="h-4 w-4 text-red-400" />
+                  <span className="hidden sm:inline">Logout</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Dynamic Tab Views */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-6"
+            >
         
         {/* ==================== TAB 1: OVERVIEW STATISTICS ==================== */}
         {activeTab === 'stats' && (
@@ -1806,8 +1880,11 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
           </div>
         )}
 
-      </div>
+            </motion.div>
+          </AnimatePresence>
 
+        </div>
+      </div>
     </div>
   );
 }
