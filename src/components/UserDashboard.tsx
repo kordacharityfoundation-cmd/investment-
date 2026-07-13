@@ -92,7 +92,36 @@ export default function UserDashboard({ user, onNavigateToPlans }: UserDashboard
     setChatMessages(getSavedChats().filter(c => c.userEmail === user.email));
     setActivities(getSavedActivities().filter(a => a.userEmail === user.email));
     setNotifications(getSavedNotifications().filter(n => n.userEmail === user.email));
-    setPaymentConfig(getPaymentConfig());
+    
+    const config = getPaymentConfig();
+    setPaymentConfig(config);
+
+    // Dynamic withdrawal method auto-selection if chosen method is toggled off
+    const isBtcActive = config.showBtc !== false;
+    const isTrcActive = config.showTrc !== false;
+    const isErcActive = config.showErc !== false;
+    const isBankActive = config.showBank !== false;
+
+    setWithdrawalMethod((currentVal) => {
+      if (currentVal === 'Bitcoin (BTC)' && !isBtcActive) {
+        if (isTrcActive) return 'USDT (TRC20)';
+        if (isErcActive) return 'USDT (ERC20)';
+        if (isBankActive) return 'Bank Transfer';
+      } else if (currentVal === 'USDT (TRC20)' && !isTrcActive) {
+        if (isBtcActive) return 'Bitcoin (BTC)';
+        if (isErcActive) return 'USDT (ERC20)';
+        if (isBankActive) return 'Bank Transfer';
+      } else if (currentVal === 'USDT (ERC20)' && !isErcActive) {
+        if (isBtcActive) return 'Bitcoin (BTC)';
+        if (isTrcActive) return 'USDT (TRC20)';
+        if (isBankActive) return 'Bank Transfer';
+      } else if (currentVal === 'Bank Transfer' && !isBankActive) {
+        if (isBtcActive) return 'Bitcoin (BTC)';
+        if (isTrcActive) return 'USDT (TRC20)';
+        if (isErcActive) return 'USDT (ERC20)';
+      }
+      return currentVal;
+    });
   };
 
   useEffect(() => {
@@ -764,10 +793,10 @@ export default function UserDashboard({ user, onNavigateToPlans }: UserDashboard
                       onChange={(e) => setWithdrawalMethod(e.target.value)}
                       className="w-full rounded-xl border border-white/5 bg-[#030310] px-3.5 py-3 text-xs text-white focus:border-purple-500/50 focus:outline-none min-h-[44px]"
                     >
-                      <option value="Bitcoin (BTC)">Bitcoin (BTC)</option>
-                      <option value="USDT (TRC20)">USDT (TRC20)</option>
-                      <option value="USDT (ERC20)">USDT (ERC20)</option>
-                      <option value="Bank Transfer">Bank Transfer</option>
+                      {paymentConfig.showBtc !== false && <option value="Bitcoin (BTC)">Bitcoin (BTC)</option>}
+                      {paymentConfig.showTrc !== false && <option value="USDT (TRC20)">USDT (TRC20)</option>}
+                      {paymentConfig.showErc !== false && <option value="USDT (ERC20)">USDT (ERC20)</option>}
+                      {paymentConfig.showBank !== false && <option value="Bank Transfer">Bank Transfer</option>}
                     </select>
                   </div>
 

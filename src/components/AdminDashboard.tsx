@@ -303,6 +303,13 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
     }));
   };
 
+  const handleToggleGateway = (key: string) => {
+    setPaymentConfig((prev: any) => ({
+      ...prev,
+      [key]: prev[key] === false ? true : false
+    }));
+  };
+
   // 6. QR Code Image File Uploads
   const handleQrUpload = (e: React.ChangeEvent<HTMLInputElement>, methodKey: string) => {
     if (e.target.files && e.target.files[0]) {
@@ -1232,6 +1239,79 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
                 <p className="text-xs text-gray-400 font-light">
                   Specify receiving banking wire details and crypto wallet addresses. These update on deposit cards instantly.
                 </p>
+              </div>
+
+              {/* Visibility Toggles Grid Segment */}
+              <div className="bg-[#05041a]/60 rounded-xl p-4 border border-purple-500/10 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-purple-400">Gateway Visibility Switches</span>
+                  <span className="text-[9px] text-gray-400">Toggle to enable/disable on client dashboard</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Bank Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleGateway('showBank')}
+                    className={`px-3 py-2.5 rounded-lg border text-xs font-bold transition-all flex items-center justify-between min-h-[40px] active:scale-95 ${
+                      paymentConfig.showBank !== false
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                        : 'bg-red-500/5 border-red-500/20 text-gray-500 hover:bg-red-500/10'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">🏦 Bank Wire</span>
+                    <span className="text-[8px] font-mono font-black uppercase px-1.5 py-0.5 rounded bg-black/40">
+                      {paymentConfig.showBank !== false ? 'ON' : 'OFF'}
+                    </span>
+                  </button>
+
+                  {/* BTC Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleGateway('showBtc')}
+                    className={`px-3 py-2.5 rounded-lg border text-xs font-bold transition-all flex items-center justify-between min-h-[40px] active:scale-95 ${
+                      paymentConfig.showBtc !== false
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                        : 'bg-red-500/5 border-red-500/20 text-gray-500 hover:bg-red-500/10'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">₿ Bitcoin</span>
+                    <span className="text-[8px] font-mono font-black uppercase px-1.5 py-0.5 rounded bg-black/40">
+                      {paymentConfig.showBtc !== false ? 'ON' : 'OFF'}
+                    </span>
+                  </button>
+
+                  {/* TRC Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleGateway('showTrc')}
+                    className={`px-3 py-2.5 rounded-lg border text-xs font-bold transition-all flex items-center justify-between min-h-[40px] active:scale-95 ${
+                      paymentConfig.showTrc !== false
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                        : 'bg-red-500/5 border-red-500/20 text-gray-500 hover:bg-red-500/10'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">₮ USDT TRC20</span>
+                    <span className="text-[8px] font-mono font-black uppercase px-1.5 py-0.5 rounded bg-black/40">
+                      {paymentConfig.showTrc !== false ? 'ON' : 'OFF'}
+                    </span>
+                  </button>
+
+                  {/* ERC Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleGateway('showErc')}
+                    className={`px-3 py-2.5 rounded-lg border text-xs font-bold transition-all flex items-center justify-between min-h-[40px] active:scale-95 ${
+                      paymentConfig.showErc !== false
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                        : 'bg-red-500/5 border-red-500/20 text-gray-500 hover:bg-red-500/10'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">♦ USDT ERC20</span>
+                    <span className="text-[8px] font-mono font-black uppercase px-1.5 py-0.5 rounded bg-black/40">
+                      {paymentConfig.showErc !== false ? 'ON' : 'OFF'}
+                    </span>
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-4">

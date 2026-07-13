@@ -126,7 +126,7 @@ export default function DepositPage({ user, initialSelectedPlan, onBackToDashboa
   const activeBankDetails = `Beneficiary: ${paymentConfig.accountName || 'Musk Investment Corp'}\nBank Name: ${paymentConfig.bankName || 'Starbase Galactic Credit Union'}\nAccount No: ${paymentConfig.accountNumber || '184-7392-1029'}\nRouting No: ${paymentConfig.routingNumber || '021000021'}`;
 
   const paymentMethods = [
-    {
+    ...(paymentConfig.showBtc !== false ? [{
       id: 'btc',
       name: 'Bitcoin (BTC)',
       type: 'Crypto',
@@ -134,8 +134,8 @@ export default function DepositPage({ user, initialSelectedPlan, onBackToDashboa
       placeholder: 'Send exactly the BTC equivalent value to this secure wallet address.',
       icon: '₿',
       qr: qrConfig.btcQr
-    },
-    {
+    }] : []),
+    ...(paymentConfig.showTrc !== false ? [{
       id: 'usdt-trc20',
       name: 'USDT (TRC20)',
       type: 'Crypto',
@@ -143,8 +143,8 @@ export default function DepositPage({ user, initialSelectedPlan, onBackToDashboa
       placeholder: 'Use the TRC20 / Tron Network when sending funds to prevent token loss.',
       icon: '₮',
       qr: qrConfig.usdtTrcQr
-    },
-    {
+    }] : []),
+    ...(paymentConfig.showErc !== false ? [{
       id: 'usdt-erc20',
       name: 'USDT (ERC20)',
       type: 'Crypto',
@@ -152,8 +152,8 @@ export default function DepositPage({ user, initialSelectedPlan, onBackToDashboa
       placeholder: 'Use the ERC20 / Ethereum Network when sending funds.',
       icon: '♦',
       qr: qrConfig.usdtErcQr
-    },
-    {
+    }] : []),
+    ...(paymentConfig.showBank !== false ? [{
       id: 'bank',
       name: 'Bank Wire / Transfer',
       type: 'Fiat',
@@ -161,7 +161,7 @@ export default function DepositPage({ user, initialSelectedPlan, onBackToDashboa
       placeholder: 'Initiate a standard bank wire or ACH. Ensure you include the reference code in transfer description.',
       icon: '🏦',
       qr: qrConfig.bankQr
-    }
+    }] : [])
   ];
 
   const handleCopyToClipboard = (text: string) => {

@@ -31,6 +31,10 @@ export interface PaymentMethodsConfig {
   btcAddress: string;
   usdtTrcAddress: string;
   usdtErcAddress: string;
+  showBank?: boolean;
+  showBtc?: boolean;
+  showTrc?: boolean;
+  showErc?: boolean;
 }
 
 export interface QrCodesConfig {
@@ -212,7 +216,11 @@ export const DEFAULT_PAYMENT_CONFIG: PaymentMethodsConfig = {
   routingNumber: '021000021',
   btcAddress: '1MuSk77vXz8S8VPrAdAr8S73v48yPnC9E9',
   usdtTrcAddress: 'TX9MuSkTRC20PlAtForMe198473210vY9s',
-  usdtErcAddress: '0x9a7bMuSkERC20F000de739D7Fbe41983021'
+  usdtErcAddress: '0x9a7bMuSkERC20F000de739D7Fbe41983021',
+  showBank: true,
+  showBtc: true,
+  showTrc: true,
+  showErc: true
 };
 
 // Default QR code placeholders
