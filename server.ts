@@ -123,6 +123,204 @@ async function writeDB(updates: Record<string, any>) {
 }
 
 // Get full database state
+app.post("/api/register-user", async (req, res) => {
+  const { email, password, name, phone, address } = req.body;
+
+  if (!email || !password || !name) {
+    res.status(400).json({ error: "Missing required registration parameters (email, password, and name are mandatory)." });
+    return;
+  }
+
+  const trimmedEmail = email.trim().toLowerCase();
+
+  // Validate password length
+  if (password.length < 6) {
+    res.status(400).json({ error: "Password must be at least 6 characters." });
+    return;
+  }
+
+  if (supabaseUrl && supabaseKey) {
+    try {
+      const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseKey;
+      const adminClient = createClient(supabaseUrl, adminKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false
+        }
+      });
+
+      // 1. Check if user already exists in profiles
+      const { data: existingProfiles, error: checkError } = await adminClient
+        .from("profiles")
+        .select("email")
+        .eq("email", trimmedEmail);
+
+      if (existingProfiles && existingProfiles.length > 0) {
+        res.status(400).json({ error: "An account with this email address already exists. Please login instead." });
+        return;
+      }
+
+      // 2. Create the Auth user with email_confirm: true (which bypasses email verification)
+      const { data: userData, error: createError } = await adminClient.auth.admin.createUser({
+        email: trimmedEmail,
+        password: password,
+        email_confirm: true,
+        user_metadata: { name, phone }
+      });
+
+      if (createError) {
+        res.status(400).json({ error: createError.message });
+        return;
+      }
+
+      const user = userData.user;
+      if (!user) {
+        res.status(500).json({ error: "Could not create authenticated user node." });
+        return;
+      }
+
+      // 3. Create the profile record
+      const avatarSeed = "SEED_" + Math.floor(Math.random() * 10000);
+      let assignedRole = "user";
+      if (["kordacharityfoundation@gmail.com", "admin@muskinvestment.com"].includes(trimmedEmail)) {
+        assignedRole = "admin";
+      }
+
+      const { error: profileError } = await adminClient
+        .from("profiles")
+        .insert({
+          id: user.id,
+          name,
+          email: trimmedEmail,
+          phone: phone || null,
+          address: address || null,
+          role: assignedRole,
+          status: "Active",
+          avatar_seed: avatarSeed
+        });
+
+      if (profileError) {
+        // Clean up created user to allow retries
+        await adminClient.auth.admin.deleteUser(user.id);
+        res.status(400).json({ error: `Profile creation failed: ${profileError.message}` });
+        return;
+      }
+
+      // 4. Create the welcome notification
+      try {
+        await adminClient
+          .from("notifications")
+          .insert({
+            user_id: user.id,
+            user_email: trimmedEmail,
+            title: "Investor Node Certified",
+            message: "Welcome to Musk Investments. Your asset-compounding node is fully synced and operational.",
+            type: "general"
+          });
+      } catch (notifErr: any) {
+        console.warn("Failed to create welcome notification on backend:", notifErr.message);
+      }
+
+      // 5. Create the activity log
+      try {
+        await adminClient
+          .from("activity_logs")
+          .insert({
+            user_id: user.id,
+            user_email: trimmedEmail,
+            action: "Completed investor onboarding and registered successfully.",
+            type: "User"
+          });
+      } catch (actErr: any) {
+        console.warn("Failed to log signup activity on backend:", actErr.message);
+      }
+
+      res.json({ success: true, userId: user.id, email: trimmedEmail });
+      return;
+
+    } catch (err: any) {
+      console.error("Exception during registration process:", err);
+      res.status(500).json({ error: err.message || "An unexpected registration error occurred." });
+      return;
+    }
+  } else {
+    // Local-only/mock database mode fallback
+    try {
+      const db = await readDB();
+      const usersList = db.musk_users_local || [];
+      if (usersList.some((u: any) => u.email.toLowerCase() === trimmedEmail)) {
+        res.status(400).json({ error: "An account with this email address already exists. Please login instead." });
+        return;
+      }
+
+      const mockUserId = "mock-uid-" + Date.now();
+      const avatarSeed = "SEED_" + Math.floor(Math.random() * 10000);
+      let assignedRole = "user";
+      if (["kordacharityfoundation@gmail.com", "admin@muskinvestment.com"].includes(trimmedEmail)) {
+        assignedRole = "admin";
+      }
+
+      const newUser = {
+        id: mockUserId,
+        name,
+        email: trimmedEmail,
+        password,
+        phone,
+        address,
+        role: assignedRole,
+        status: "Active",
+        avatar_seed: avatarSeed
+      };
+
+      usersList.push(newUser);
+      await writeDB({ musk_users_local: usersList });
+
+      res.json({ success: true, userId: mockUserId, email: trimmedEmail });
+      return;
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "An unexpected local registration error occurred." });
+      return;
+    }
+  }
+});
+
+app.post("/api/login-user", async (req, res) => {
+  const { email, password } = req.body;
+  const trimmedEmail = email.trim().toLowerCase();
+
+  try {
+    const db = await readDB();
+    const usersList = db.musk_users_local || [];
+    const matchedUser = usersList.find((u: any) => u.email.toLowerCase() === trimmedEmail && u.password === password);
+
+    if (matchedUser) {
+      res.json({
+        success: true,
+        user: {
+          id: matchedUser.id,
+          email: matchedUser.email,
+          user_metadata: { name: matchedUser.name }
+        },
+        profile: {
+          id: matchedUser.id,
+          name: matchedUser.name,
+          email: matchedUser.email,
+          phone: matchedUser.phone,
+          address: matchedUser.address,
+          role: matchedUser.role,
+          status: matchedUser.status,
+          avatar_seed: matchedUser.avatar_seed
+        }
+      });
+    } else {
+      res.status(401).json({ error: "Invalid email address or password." });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "An error occurred during local authentication." });
+  }
+});
+
+// Get full database state
 app.get("/api/db", async (req, res) => {
   const db = await readDB();
   res.json({ success: true, db });

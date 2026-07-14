@@ -41,7 +41,6 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
-  const [resending, setResending] = useState(false);
 
   // Sync initial view when opening
   useEffect(() => {
@@ -165,98 +164,30 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
         return;
       }
 
-      // 2. Call Supabase Auth signUp
-      const { data, error: signupErr } = await supabase.auth.signUp({
-        email: trimmedEmail,
-        password: regPassword,
-        options: {
-          data: {
-            name: regName,
-            phone: regPhone,
-          }
+      // 2. Call the register-user Edge Function instead of supabase.auth.signUp()
+      const { data, error: signupErr } = await supabase.functions.invoke('register-user', {
+        body: {
+          email: trimmedEmail,
+          password: regPassword,
+          name: regName,
+          phone: regPhone,
+          address: regAddress
         }
       });
 
       if (signupErr) {
-        setError(signupErr.message);
+        setError(signupErr.message || 'Registration failed. Please try again.');
         setLoading(false);
         return;
       }
 
-      if (data.user) {
-        // Determine role based on email (keep admin login and role-based access as is)
-        let assignedRole = 'user';
-        if (['kordacharityfoundation@gmail.com', 'admin@muskinvestment.com'].includes(trimmedEmail)) {
-          assignedRole = 'admin';
-        }
-
-        // 3. Ensure profile is created in public.profiles table if it doesn't already exist
-        const { data: profileCheck } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', data.user.id)
-          .single();
-
-        if (!profileCheck) {
-          // If the profile doesn't exist yet, attempt to insert it manually
-          const { error: insertErr } = await supabase
-            .from('profiles')
-            .insert({
-              id: data.user.id,
-              name: regName,
-              email: trimmedEmail,
-              phone: regPhone,
-              address: regAddress,
-              status: 'Active',
-              role: assignedRole,
-              avatar_seed: 'SEED_' + Math.floor(Math.random() * 10000)
-            });
-          if (insertErr) {
-            console.warn("Manual profile insert warning:", insertErr);
-          }
-        } else {
-          // Profile exists, update detailed fields like address and phone
-          await supabase
-            .from('profiles')
-            .update({
-              address: regAddress,
-              phone: regPhone,
-              name: regName
-            })
-            .eq('id', data.user.id);
-        }
-
-        // 4. Send a welcome notification row into Supabase notifications table
-        try {
-          await supabase
-            .from('notifications')
-            .insert({
-              user_id: data.user.id,
-              user_email: trimmedEmail,
-              title: 'Investor Node Certified',
-              message: 'Welcome to Musk Investments. Your asset-compounding node is fully synced and operational.',
-              type: 'general'
-            });
-        } catch (notifErr) {
-          console.warn("Failed to create welcome notification:", notifErr);
-        }
-
-        // 5. Log activity
-        try {
-          await supabase
-            .from('activity_logs')
-            .insert({
-              user_id: data.user.id,
-              user_email: trimmedEmail,
-              action: 'Completed investor onboarding and registered successfully.',
-              type: 'User'
-            });
-        } catch (actErr) {
-          console.warn("Failed to log signup activity:", actErr);
-        }
+      if (data && data.error) {
+        setError(data.error);
+        setLoading(false);
+        return;
       }
 
-      // 6. Automatically sign them in immediately
+      // 3. Automatically sign them in immediately
       const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
         email: trimmedEmail,
         password: regPassword,
@@ -320,16 +251,6 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
     setTimeout(() => {
       setLoading(false);
       setSuccessMsg('Password reset instructions have been sent to your email address.');
-    }, 1200);
-  };
-
-  const handleResendVerification = () => {
-    setError('');
-    setResending(true);
-    setTimeout(() => {
-      setResending(false);
-      setSuccessMsg('Verification email has been resent successfully.');
-      setTimeout(() => setSuccessMsg(''), 4000);
     }, 1200);
   };
 
@@ -768,66 +689,6 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
                   </button>
                 </form>
               )}
-            </motion.div>
-          )}
-
-          {/* ==================== EMAIL VERIFICATION VIEW ==================== */}
-          {view === 'verify' && (
-            <motion.div
-              key="verify-view"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="text-center space-y-6"
-            >
-              <div className="inline-flex rounded-full bg-purple-500/10 p-4 border border-purple-500/20 glow-purple">
-                <CheckCircle2 className="h-10 w-10 text-purple-400" />
-              </div>
-
-              <div className="space-y-2">
-                <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                  Verify Your Identity
-                </h2>
-                <p className="text-sm text-emerald-400 font-semibold flex items-center justify-center gap-1.5">
-                  Your account has been created successfully.
-                </p>
-                <p className="text-sm text-gray-400 font-light leading-relaxed px-4 pt-2">
-                  Please verify your email address before accessing all platform features. We sent a verification node token link to <strong className="text-white font-medium">{regEmail || 'your email'}</strong>.
-                </p>
-              </div>
-
-              {successMsg && (
-                <div id="verify-success-notif" className="flex items-center gap-2 rounded-xl bg-purple-500/10 p-3.5 border border-purple-500/20 text-xs text-purple-300 justify-center">
-                  <CheckCircle2 className="h-4.5 w-4.5 text-purple-400 shrink-0" />
-                  <span>{successMsg}</span>
-                </div>
-              )}
-
-              <div className="flex flex-col gap-3 pt-4">
-                <button
-                  id="verify-continue-btn"
-                  onClick={() => setView('success')}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 py-4 text-base font-semibold text-white shadow-lg shadow-purple-500/20 transition-all min-h-[48px]"
-                >
-                  <span>Continue To Success Page</span>
-                  <ArrowRight className="h-5 w-5" />
-                </button>
-
-                <button
-                  id="verify-resend-btn"
-                  onClick={handleResendVerification}
-                  disabled={resending}
-                  className="w-full rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 py-3.5 text-sm font-semibold text-white transition-all flex items-center justify-center gap-2 min-h-[44px]"
-                >
-                  <RefreshCw className={`h-4 w-4 text-gray-400 ${resending ? 'animate-spin text-purple-400' : ''}`} />
-                  <span>{resending ? 'Resending Token Link...' : 'Resend Verification Email'}</span>
-                </button>
-              </div>
-
-              <p className="text-xs text-gray-500">
-                Can't find the email? Check your spam/junk folder or contact investor node support.
-              </p>
             </motion.div>
           )}
 
