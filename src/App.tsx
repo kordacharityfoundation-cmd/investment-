@@ -104,6 +104,65 @@ export default function App() {
     localStorage.removeItem('musk_admin_user');
   };
 
+  // Auto logout on inactivity (10 minutes)
+  useEffect(() => {
+    // Only set up if either a client user or admin user is logged in
+    if (!user && !adminUser) return;
+
+    const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
+    
+    // Store the start/initial last active time
+    localStorage.setItem('musk_last_active', Date.now().toString());
+
+    // Function to update last active timestamp
+    const updateActivity = () => {
+      localStorage.setItem('musk_last_active', Date.now().toString());
+    };
+
+    // Events to monitor for activity
+    const activityEvents = [
+      'mousedown',
+      'mousemove',
+      'keypress',
+      'scroll',
+      'touchstart',
+      'click'
+    ];
+
+    // Add listeners
+    activityEvents.forEach((event) => {
+      window.addEventListener(event, updateActivity, { passive: true });
+    });
+
+    // Periodically check if 10 minutes have elapsed since the last activity
+    const interval = setInterval(() => {
+      const lastActiveRaw = localStorage.getItem('musk_last_active');
+      if (lastActiveRaw) {
+        const lastActive = parseInt(lastActiveRaw, 10);
+        const now = Date.now();
+        if (now - lastActive >= INACTIVITY_TIMEOUT) {
+          // Time expired! Log out!
+          if (user) {
+            handleLogout();
+            alert('Your investment session has expired due to 10 minutes of inactivity. Please log in again to continue.');
+          }
+          if (adminUser) {
+            handleAdminLogout();
+            alert('Your administrative gateway session has expired due to 10 minutes of inactivity.');
+          }
+        }
+      }
+    }, 5000); // Check every 5 seconds for precise monitoring
+
+    return () => {
+      // Clean up listeners and interval
+      activityEvents.forEach((event) => {
+        window.removeEventListener(event, updateActivity);
+      });
+      clearInterval(interval);
+    };
+  }, [user, adminUser]);
+
   const handleOpenAuth = (tab: 'login' | 'register') => {
     setAuthModal({
       isOpen: true,
