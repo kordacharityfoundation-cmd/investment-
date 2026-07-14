@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../utils/supabaseClient';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Mail, Lock, User, Phone, MapPin, Eye, EyeOff, 
@@ -55,7 +56,7 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
   if (!isOpen) return null;
 
   // Form Validation and submission handlers
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
@@ -69,49 +70,65 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
     }
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      
-      const savedUsersRaw = localStorage.getItem('musk_users');
-      let usersList = [];
-      if (savedUsersRaw) {
-        try {
-          usersList = JSON.parse(savedUsersRaw);
-        } catch (err) {
-          usersList = [];
+
+    try {
+      const { data, error: loginErr } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password: trimmedPassword,
+      });
+
+      if (loginErr) {
+        setError(loginErr.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        // Query the profiles table using user ID
+        const { data: profile, error: profileErr } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileErr || !profile) {
+          console.error("Missing profile for user ID:", data.user.id);
+          setError('User profile not found. Please contact support.');
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
         }
-      }
 
-      const userFound = usersList.find((u: any) => u.email.trim().toLowerCase() === trimmedEmail);
-      if (!userFound) {
-        setError('This email address is not registered on our gateway. Please register first.');
-        return;
-      }
+        if (profile.status === 'Suspended') {
+          setError('Your investor account has been suspended by our compliance board. Access denied.');
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
 
-      if (userFound.status === 'Suspended') {
-        setError('Your investor account has been suspended by our compliance board. Access denied.');
-        return;
-      }
+        const loggedUser: UserState = {
+          id: profile.id,
+          isLoggedIn: true,
+          name: profile.name,
+          email: profile.email,
+          phone: profile.phone || '',
+          address: profile.address || '',
+          status: profile.status,
+          role: profile.role,
+          avatarSeed: profile.avatar_seed || 'default'
+        };
 
-      const isValidPassword = !userFound.password || userFound.password.trim() === trimmedPassword;
-      if (!isValidPassword) {
-        setError('Invalid compliance password signature. Please verify your credentials.');
-        return;
+        onAuthSuccess(loggedUser);
+        onClose();
       }
-
-      const loggedUser: UserState = {
-        isLoggedIn: true,
-        name: userFound.name,
-        email: userFound.email,
-        avatarSeed: userFound.name.toUpperCase()
-      };
-      
-      onAuthSuccess(loggedUser);
-      onClose();
-    }, 1500);
+    } catch (err: any) {
+      setError(err.message || 'An unexpected login error occurred.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
@@ -132,50 +149,42 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
     }
 
     setLoading(true);
-    setTimeout(() => {
-      const savedUsersRaw = localStorage.getItem('musk_users');
-      let currentUsers = [];
-      if (savedUsersRaw) {
-        try {
-          currentUsers = JSON.parse(savedUsersRaw);
-        } catch (err) {
-          currentUsers = [];
-        }
-      }
 
-      const exists = currentUsers.some((u: any) => u.email.toLowerCase() === regEmail.toLowerCase());
-      if (exists) {
+    try {
+      const { data, error: signupErr } = await supabase.auth.signUp({
+        email: regEmail,
+        password: regPassword,
+        options: {
+          data: {
+            name: regName,
+            phone: regPhone,
+          }
+        }
+      });
+
+      if (signupErr) {
+        setError(signupErr.message);
         setLoading(false);
-        setError('This email address is already registered on our gateway.');
         return;
       }
 
-      const searchParams = new URLSearchParams(window.location.search);
-      const referralCode = searchParams.get('ref') || '';
-
-      const isFirstUser = currentUsers.length === 0;
-
-      const newUser = {
-        id: `user-${Date.now()}`,
-        name: regName,
-        email: regEmail,
-        phone: regPhone,
-        address: regAddress,
-        status: 'Active' as const,
-        dateCreated: new Date().toISOString().substring(0, 10),
-        password: regPassword,
-        referredBy: referralCode,
-        role: isFirstUser ? 'admin' : 'user',
-        isAdmin: isFirstUser ? true : false
-      };
-
-      currentUsers.push(newUser);
-      localStorage.setItem('musk_users', JSON.stringify(currentUsers));
+      if (data.user) {
+        // Since profile trigger creates profiles on sign up, we try to write/update address
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await supabase
+            .from('profiles')
+            .update({ address: regAddress })
+            .eq('id', data.user.id);
+        }
+      }
 
       setLoading(false);
-      // Go to email verification screen as requested
       setView('verify');
-    }, 1500);
+    } catch (err: any) {
+      setError(err.message || 'An unexpected registration error occurred.');
+      setLoading(false);
+    }
   };
 
   const handleForgotPassword = (e: React.FormEvent) => {

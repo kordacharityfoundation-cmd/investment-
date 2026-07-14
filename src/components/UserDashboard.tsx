@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../utils/supabaseClient';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, Coins, ShieldCheck, ArrowRight, Wallet, ArrowDownLeft,
@@ -8,10 +9,7 @@ import {
 } from 'lucide-react';
 import { UserState } from '../types';
 import { 
-  getSavedAnnouncements, getSavedWithdrawals, getSavedPlans, 
-  WithdrawalRequest, getPaymentConfig, getSavedTickets, getSavedChats,
-  getSavedActivities, getSavedNotifications, logActivity, addNotification,
-  SupportTicket, ChatMessage, ActivityLog, NotificationItem
+  WithdrawalRequest, SupportTicket, ChatMessage, ActivityLog, NotificationItem
 } from '../utils/db';
 import { DepositTransaction } from './Plans';
 
@@ -57,8 +55,8 @@ export default function UserDashboard({ user, onNavigateToPlans }: UserDashboard
 
   // Profile Edit States
   const [profileName, setProfileName] = useState(user.name);
-  const [profilePhone, setProfilePhone] = useState('+1 (555) 420-6969');
-  const [profileAddress, setProfileAddress] = useState('1 Starbase Blvd, Boca Chica, TX');
+  const [profilePhone, setProfilePhone] = useState(user.phone || '+1 (555) 420-6969');
+  const [profileAddress, setProfileAddress] = useState(user.address || '1 Starbase Blvd, Boca Chica, TX');
   const [profilePassword, setProfilePassword] = useState('••••••••');
   const [profileEmail, setProfileEmail] = useState(user.email);
   const [profileSuccessMsg, setProfileSuccessMsg] = useState('');
@@ -69,67 +67,178 @@ export default function UserDashboard({ user, onNavigateToPlans }: UserDashboard
   const [successMsg, setSuccessMsg] = useState('');
   const [copyConfirmed, setCopyConfirmed] = useState(false);
 
-  // Load and sync with Local Storage Mock Database
-  const loadDashboardData = () => {
-    setAnnouncements(getSavedAnnouncements());
-    
-    // Load deposits
-    const savedDeps = localStorage.getItem('musk_deposits');
-    let userDeps: DepositTransaction[] = [];
-    if (savedDeps) {
-      try {
-        const parsed = JSON.parse(savedDeps);
-        userDeps = parsed.filter((d: any) => (d.userEmail && d.userEmail.toLowerCase() === user.email.toLowerCase()) || (d.email && d.email.toLowerCase() === user.email.toLowerCase()));
-      } catch (e) {
-        userDeps = [];
+  // Load and sync with Supabase Real Production Database
+  const loadDashboardData = async () => {
+    try {
+      // 1. Fetch announcements
+      const { data: annData } = await supabase
+        .from('announcements')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (annData) {
+        setAnnouncements(annData.map(a => ({
+          id: a.id,
+          text: a.text,
+          category: a.category,
+          date: new Date(a.created_at).toISOString().replace('T', ' ').substring(0, 16)
+        })));
       }
+      
+      // 2. Fetch deposits
+      const { data: depData } = await supabase
+        .from('deposits')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (depData) {
+        setDeposits(depData.map(d => ({
+          id: d.id,
+          userEmail: d.user_email,
+          planId: d.plan_id,
+          amount: Number(d.amount),
+          paymentMethod: d.payment_method,
+          status: d.status,
+          referenceNo: d.reference_no,
+          date: new Date(d.created_at).toISOString().replace('T', ' ').substring(0, 16)
+        })));
+      }
+
+      // 3. Fetch withdrawals
+      const { data: withData } = await supabase
+        .from('withdrawals')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (withData) {
+        setWithdrawals(withData.map(w => ({
+          id: w.id,
+          userEmail: w.user_email,
+          amount: Number(w.amount),
+          paymentMethod: w.payment_method,
+          addressDetails: w.address_details,
+          status: w.status,
+          referenceNo: w.reference_no,
+          date: new Date(w.created_at).toISOString().replace('T', ' ').substring(0, 16)
+        })));
+      }
+
+      // 4. Fetch support tickets
+      const { data: tickData } = await supabase
+        .from('support_tickets')
+        .select('*, ticket_replies(*)')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (tickData) {
+        setTickets(tickData.map(t => ({
+          id: t.id,
+          userEmail: t.user_email,
+          userName: t.user_name,
+          subject: t.subject,
+          category: t.category,
+          priority: t.priority,
+          message: t.message,
+          status: t.status,
+          date: new Date(t.created_at).toISOString().replace('T', ' ').substring(0, 16),
+          replies: (t.ticket_replies || []).map((r: any) => ({
+            id: r.id,
+            sender: r.sender,
+            senderName: r.sender_name,
+            message: r.message,
+            date: new Date(r.created_at).toISOString().replace('T', ' ').substring(0, 16)
+          })).sort((a: any, b: any) => a.date.localeCompare(b.date))
+        })));
+      }
+
+      // 5. Fetch chat messages
+      const { data: chatData } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
+      if (chatData) {
+        setChatMessages(chatData.map(c => ({
+          id: c.id,
+          userEmail: c.user_email,
+          userName: c.user_name,
+          sender: c.sender,
+          message: c.message,
+          date: new Date(c.created_at).toISOString().replace('T', ' ').substring(0, 16)
+        })));
+      }
+
+      // 6. Fetch activity logs
+      const { data: actData } = await supabase
+        .from('activity_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (actData) {
+        setActivities(actData.map(a => ({
+          id: a.id,
+          userEmail: a.user_email,
+          action: a.action,
+          type: a.type,
+          date: new Date(a.created_at).toISOString().replace('T', ' ').substring(0, 16)
+        })));
+      }
+
+      // 7. Fetch notifications
+      const { data: notData } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (notData) {
+        setNotifications(notData.map(n => ({
+          id: n.id,
+          userEmail: n.user_email,
+          title: n.title,
+          message: n.message,
+          isRead: n.is_read,
+          type: n.type,
+          date: new Date(n.created_at).toISOString().replace('T', ' ').substring(0, 16)
+        })));
+      }
+
+      // 8. Fetch payment config
+      const { data: payData } = await supabase
+        .from('payment_config')
+        .select('*')
+        .eq('id', 1)
+        .single();
+      if (payData) {
+        const config = {
+          bankName: payData.bank_name,
+          accountName: payData.account_name,
+          accountNumber: payData.account_number,
+          routingNumber: payData.routing_number,
+          btcAddress: payData.btc_address,
+          usdtTrcAddress: payData.usdt_trc_address,
+          usdtErcAddress: payData.usdt_erc_address,
+          showBank: true,
+          showBtc: true,
+          showTrc: true,
+          showErc: true
+        };
+        setPaymentConfig(config);
+
+        // Dynamic withdrawal method selection
+        setWithdrawalMethod((currentVal) => {
+          if (currentVal === 'Bitcoin (BTC)') return 'Bitcoin (BTC)';
+          return currentVal;
+        });
+      }
+    } catch (err) {
+      console.error("Error loading user dashboard data from Supabase:", err);
     }
-    setDeposits(userDeps);
-
-    // Sync everything else
-    setWithdrawals(getSavedWithdrawals().filter(w => w.userEmail.toLowerCase() === user.email.toLowerCase()));
-    setTickets(getSavedTickets().filter(t => t.userEmail === user.email));
-    setChatMessages(getSavedChats().filter(c => c.userEmail === user.email));
-    setActivities(getSavedActivities().filter(a => a.userEmail === user.email));
-    setNotifications(getSavedNotifications().filter(n => n.userEmail === user.email));
-    
-    const config = getPaymentConfig();
-    setPaymentConfig(config);
-
-    // Dynamic withdrawal method auto-selection if chosen method is toggled off
-    const isBtcActive = config.showBtc !== false;
-    const isTrcActive = config.showTrc !== false;
-    const isErcActive = config.showErc !== false;
-    const isBankActive = config.showBank !== false;
-
-    setWithdrawalMethod((currentVal) => {
-      if (currentVal === 'Bitcoin (BTC)' && !isBtcActive) {
-        if (isTrcActive) return 'USDT (TRC20)';
-        if (isErcActive) return 'USDT (ERC20)';
-        if (isBankActive) return 'Bank Transfer';
-      } else if (currentVal === 'USDT (TRC20)' && !isTrcActive) {
-        if (isBtcActive) return 'Bitcoin (BTC)';
-        if (isErcActive) return 'USDT (ERC20)';
-        if (isBankActive) return 'Bank Transfer';
-      } else if (currentVal === 'USDT (ERC20)' && !isErcActive) {
-        if (isBtcActive) return 'Bitcoin (BTC)';
-        if (isTrcActive) return 'USDT (TRC20)';
-        if (isBankActive) return 'Bank Transfer';
-      } else if (currentVal === 'Bank Transfer' && !isBankActive) {
-        if (isBtcActive) return 'Bitcoin (BTC)';
-        if (isTrcActive) return 'USDT (TRC20)';
-        if (isErcActive) return 'USDT (ERC20)';
-      }
-      return currentVal;
-    });
   };
 
   useEffect(() => {
     loadDashboardData();
     // Periodic synchronization check
-    const interval = setInterval(loadDashboardData, 3000);
+    const interval = setInterval(loadDashboardData, 4000);
     return () => clearInterval(interval);
-  }, [user.email]);
+  }, [user.id]);
 
   // Financial Calculators
   const approvedDeposits = deposits.filter(d => d.status === 'Approved');
@@ -137,11 +246,11 @@ export default function UserDashboard({ user, onNavigateToPlans }: UserDashboard
   const totalDeposited = deposits.reduce((acc, curr) => acc + curr.amount, 0);
   
   const totalWithdrawn = withdrawals
-    .filter(w => w.userEmail === user.email && w.status === 'Approved')
+    .filter(w => w.status === 'Approved')
     .reduce((acc, curr) => acc + curr.amount, 0);
 
   const pendingWithdrawn = withdrawals
-    .filter(w => w.userEmail === user.email && w.status === 'Pending')
+    .filter(w => w.status === 'Pending')
     .reduce((acc, curr) => acc + curr.amount, 0);
 
   // Balanced compounding estimations
@@ -157,7 +266,7 @@ export default function UserDashboard({ user, onNavigateToPlans }: UserDashboard
   };
 
   // Submit Withdrawal Request Form
-  const handleRequestWithdrawal = (e: React.FormEvent) => {
+  const handleRequestWithdrawal = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setWithdrawalSuccess(null);
@@ -180,219 +289,354 @@ export default function UserDashboard({ user, onNavigateToPlans }: UserDashboard
 
     setSubmitting(true);
 
-    setTimeout(() => {
-      setSubmitting(false);
-      
+    try {
+      const referenceNo = `MSK-${Math.floor(10000 + Math.random() * 90000)}-WTH`;
+      const fullAddress = withdrawalAddress + (transactionNote ? ` | Note: ${transactionNote}` : '');
+
+      const { data, error } = await supabase
+        .from('withdrawals')
+        .insert({
+          user_id: user.id,
+          user_email: user.email,
+          amount: amount,
+          payment_method: withdrawalMethod,
+          address_details: fullAddress,
+          status: 'Pending',
+          reference_no: referenceNo
+        })
+        .select()
+        .single();
+
+      if (error) {
+        setErrorMsg(error.message);
+        setSubmitting(false);
+        return;
+      }
+
+      // Create Notification
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: user.id,
+          user_email: user.email,
+          title: 'Withdrawal Request Submitted',
+          message: `Your withdrawal request of $${amount.toLocaleString()} via ${withdrawalMethod} has been received.`,
+          type: 'withdrawal_submitted'
+        });
+
+      // Log Activity
+      await supabase
+        .from('activity_logs')
+        .insert({
+          user_id: user.id,
+          user_email: user.email,
+          action: `Requested $${amount.toLocaleString()} withdrawal via ${withdrawalMethod}`,
+          type: 'User'
+        });
+
       const newRequest: WithdrawalRequest = {
-        id: `with-${Date.now()}`,
+        id: data.id,
         userEmail: user.email,
         amount: amount,
         paymentMethod: withdrawalMethod,
-        addressDetails: withdrawalAddress + (transactionNote ? ` | Note: ${transactionNote}` : ''),
+        addressDetails: fullAddress,
         date: new Date().toISOString().replace('T', ' ').substring(0, 16),
         status: 'Pending',
-        referenceNo: `MSK-${Math.floor(10000 + Math.random() * 90000)}-WTH`
+        referenceNo: referenceNo
       };
 
-      const updated = [newRequest, ...getSavedWithdrawals()];
-      localStorage.setItem('musk_withdrawals', JSON.stringify(updated));
-      setWithdrawals(updated);
-      
-      // Log Action and Add notification
-      logActivity(user.email, `Requested $${amount.toLocaleString()} withdrawal via ${withdrawalMethod}`);
-      addNotification(
-        user.email, 
-        'Withdrawal Request Submitted', 
-        `Your withdrawal request of $${amount.toLocaleString()} via ${withdrawalMethod} has been received.`,
-        'withdrawal_submitted'
-      );
-      
       setWithdrawalSuccess(newRequest);
       setWithdrawalAmount('');
       setWithdrawalAddress('');
       setTransactionNote('');
-    }, 1200);
+      await loadDashboardData();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error processing withdrawal request.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Profile Change triggers
-  const handleUpdateProfile = (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileSuccessMsg('');
+    setErrorMsg('');
     
-    // Simulate updating locally
-    const savedLocal = localStorage.getItem('musk_user');
-    if (savedLocal) {
-      const parsed = JSON.parse(savedLocal);
-      parsed.name = profileName;
-      localStorage.setItem('musk_user', JSON.stringify(parsed));
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: profileName,
+          phone: profilePhone,
+          address: profileAddress
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        setErrorMsg(error.message);
+        return;
+      }
+
+      // Add Notification
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: user.id,
+          user_email: user.email,
+          title: 'Profile Settings Updated',
+          message: 'Your profile address, name, and contact details were saved.',
+          type: 'general'
+        });
+
+      // Log Activity
+      await supabase
+        .from('activity_logs')
+        .insert({
+          user_id: user.id,
+          user_email: user.email,
+          action: 'Updated security profile settings',
+          type: 'User'
+        });
+
+      setProfileSuccessMsg('Security credentials and bio metrics successfully validated.');
+      setTimeout(() => setProfileSuccessMsg(''), 4000);
+      await loadDashboardData();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error updating profile.');
     }
-    
-    logActivity(user.email, 'Updated security profile settings');
-    addNotification(user.email, 'Profile Settings Updated', 'Your profile address, name, and contact details were saved.', 'general');
-    
-    setProfileSuccessMsg('Security credentials and bio metrics successfully validated.');
-    setTimeout(() => setProfileSuccessMsg(''), 4000);
   };
 
   // Support Ticket Form Submit
-  const handleCreateTicket = (e: React.FormEvent) => {
+  const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     setTicketSubmitSuccess('');
+    setErrorMsg('');
 
     if (!ticketSubject.trim() || !ticketMessage.trim()) return;
 
-    const newTicket: SupportTicket = {
-      id: `tick-${Date.now()}`,
-      userEmail: user.email,
-      userName: user.name,
-      subject: ticketSubject,
-      category: ticketCategory,
-      priority: ticketPriority,
-      message: ticketMessage,
-      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      status: 'Open',
-      replies: []
-    };
+    setSubmitting(true);
 
-    const saved = getSavedTickets();
-    const updated = [newTicket, ...saved];
-    localStorage.setItem('musk_tickets', JSON.stringify(updated));
-    setTickets(updated.filter(t => t.userEmail === user.email));
+    try {
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .insert({
+          user_id: user.id,
+          user_email: user.email,
+          user_name: user.name,
+          subject: ticketSubject,
+          category: ticketCategory,
+          priority: ticketPriority,
+          message: ticketMessage,
+          status: 'Open'
+        })
+        .select()
+        .single();
 
-    logActivity(user.email, `Created support ticket: "${ticketSubject}"`);
-    addNotification(user.email, 'Support Ticket Created', `Your ticket "${ticketSubject}" is now open for review.`, 'general');
+      if (error) {
+        setErrorMsg(error.message);
+        setSubmitting(false);
+        return;
+      }
 
-    setTicketSubject('');
-    setTicketMessage('');
-    setTicketSubmitSuccess('Support Ticket submitted successfully. Our team will reply shortly.');
-    setTimeout(() => setTicketSubmitSuccess(''), 4000);
+      // Add Notification
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: user.id,
+          user_email: user.email,
+          title: 'Support Ticket Created',
+          message: `Your ticket "${ticketSubject}" is now open for review.`,
+          type: 'general'
+        });
+
+      // Log Activity
+      await supabase
+        .from('activity_logs')
+        .insert({
+          user_id: user.id,
+          user_email: user.email,
+          action: `Created support ticket: "${ticketSubject}"`,
+          type: 'User'
+        });
+
+      setTicketSubject('');
+      setTicketMessage('');
+      setTicketSubmitSuccess('Support Ticket submitted successfully. Our team will reply shortly.');
+      setTimeout(() => setTicketSubmitSuccess(''), 4000);
+      await loadDashboardData();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error creating support ticket.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Reply to active support thread
-  const handleReplyTicket = (ticketId: string) => {
+  const handleReplyTicket = async (ticketId: string) => {
     if (!ticketReplyText.trim()) return;
 
-    const saved = getSavedTickets();
-    const updated = saved.map(t => {
-      if (t.id === ticketId) {
-        const newReply = {
-          id: `rep-${Date.now()}`,
-          sender: 'user' as const,
-          senderName: user.name,
-          message: ticketReplyText,
-          date: new Date().toISOString().replace('T', ' ').substring(0, 16)
-        };
-        const updatedReplies = [...t.replies, newReply];
-        return {
-          ...t,
-          status: 'Open' as const,
-          replies: updatedReplies
-        };
+    try {
+      const { error } = await supabase
+        .from('ticket_replies')
+        .insert({
+          ticket_id: ticketId,
+          sender: 'user',
+          sender_name: user.name,
+          message: ticketReplyText
+        });
+
+      if (error) {
+        setErrorMsg(error.message);
+        return;
       }
-      return t;
-    });
 
-    localStorage.setItem('musk_tickets', JSON.stringify(updated));
-    setTickets(updated.filter(t => t.userEmail === user.email));
-    setTicketReplyText('');
+      // Also set the ticket status back to Open
+      await supabase
+        .from('support_tickets')
+        .update({ status: 'Open' })
+        .eq('id', ticketId);
 
-    // Simulated system operator response after 2 seconds
-    setTimeout(() => {
-      const liveSaved = getSavedTickets();
-      const withAdminReply = liveSaved.map(t => {
-        if (t.id === ticketId) {
-          const adminReply = {
-            id: `rep-${Date.now() + 1}`,
-            sender: 'admin' as const,
-            senderName: 'Technical Support Operator',
-            message: 'Your message has been received by our on-duty administrative lead. We are verifying telemetry variables on your gateway. Thank you for your patience.',
-            date: new Date().toISOString().replace('T', ' ').substring(0, 16)
-          };
-          return {
-            ...t,
-            status: 'Pending' as const,
-            replies: [...t.replies, adminReply]
-          };
+      setTicketReplyText('');
+      await loadDashboardData();
+
+      // Simulated system operator response after 2 seconds
+      setTimeout(async () => {
+        try {
+          await supabase
+            .from('ticket_replies')
+            .insert({
+              ticket_id: ticketId,
+              sender: 'admin',
+              sender_name: 'Technical Support Operator',
+              message: 'Your message has been received by our on-duty administrative lead. We are verifying telemetry variables on your gateway. Thank you for your patience.'
+            });
+
+          await supabase
+            .from('support_tickets')
+            .update({ status: 'Pending' })
+            .eq('id', ticketId);
+
+          await supabase
+            .from('notifications')
+            .insert({
+              user_id: user.id,
+              user_email: user.email,
+              title: 'New Ticket Reply Received',
+              message: 'An administrator has replied to your open ticket thread.',
+              type: 'general'
+            });
+
+          await loadDashboardData();
+        } catch (err) {
+          console.error("Error sending mock admin reply:", err);
         }
-        return t;
-      });
-      localStorage.setItem('musk_tickets', JSON.stringify(withAdminReply));
-      setTickets(withAdminReply.filter(t => t.userEmail === user.email));
-      addNotification(user.email, 'New Ticket Reply Received', 'An administrator has replied to your open ticket thread.', 'general');
-    }, 2000);
+      }, 2000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error submitting reply.');
+    }
   };
 
   // Close open ticket thread
-  const handleCloseTicket = (ticketId: string) => {
-    const saved = getSavedTickets();
-    const updated = saved.map(t => {
-      if (t.id === ticketId) {
-        return { ...t, status: 'Closed' as const };
+  const handleCloseTicket = async (ticketId: string) => {
+    try {
+      const { error } = await supabase
+        .from('support_tickets')
+        .update({ status: 'Closed' })
+        .eq('id', ticketId);
+
+      if (error) {
+        setErrorMsg(error.message);
+        return;
       }
-      return t;
-    });
-    localStorage.setItem('musk_tickets', JSON.stringify(updated));
-    setTickets(updated.filter(t => t.userEmail === user.email));
-    logActivity(user.email, `Closed support ticket ID: ${ticketId}`);
+
+      await supabase
+        .from('activity_logs')
+        .insert({
+          user_id: user.id,
+          user_email: user.email,
+          action: `Closed support ticket ID: ${ticketId}`,
+          type: 'User'
+        });
+
+      await loadDashboardData();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error closing ticket.');
+    }
   };
 
   // Submit Live Chat Message
-  const handleSendChatMessage = (e: React.FormEvent) => {
+  const handleSendChatMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
 
-    const userMsg: ChatMessage = {
-      id: `chat-${Date.now()}`,
-      userEmail: user.email,
-      userName: user.name,
-      sender: 'user',
-      message: chatInput,
-      date: new Date().toISOString().replace('T', ' ').substring(0, 16)
-    };
+    try {
+      const { error } = await supabase
+        .from('chat_messages')
+        .insert({
+          user_id: user.id,
+          user_email: user.email,
+          user_name: user.name,
+          sender: 'user',
+          message: chatInput
+        });
 
-    const saved = getSavedChats();
-    const updated = [...saved, userMsg];
-    localStorage.setItem('musk_chats', JSON.stringify(updated));
-    setChatMessages(updated.filter(c => c.userEmail === user.email));
-    setChatInput('');
-    setIsChatTyping(true);
+      if (error) {
+        setErrorMsg(error.message);
+        return;
+      }
 
-    // Simulated administrative assistant reply
-    setTimeout(() => {
-      setIsChatTyping(false);
-      const assistantMsg: ChatMessage = {
-        id: `chat-${Date.now() + 1}`,
-        userEmail: user.email,
-        userName: 'System Core Operator',
-        sender: 'admin',
-        message: 'Hello! I am the automated desk assistant. Our master administrators have been notified of your message. We generally reply within 5 minutes. Feel free to leave details of your request here!',
-        date: new Date().toISOString().replace('T', ' ').substring(0, 16)
-      };
-      
-      const saved2 = getSavedChats();
-      const updated2 = [...saved2, assistantMsg];
-      localStorage.setItem('musk_chats', JSON.stringify(updated2));
-      setChatMessages(updated2.filter(c => c.userEmail === user.email));
-    }, 1800);
+      setChatInput('');
+      setIsChatTyping(true);
+      await loadDashboardData();
+
+      // Simulated administrative assistant reply
+      setTimeout(async () => {
+        try {
+          setIsChatTyping(false);
+          await supabase
+            .from('chat_messages')
+            .insert({
+              user_id: user.id,
+              user_email: user.email,
+              user_name: 'System Core Operator',
+              sender: 'admin',
+              message: 'Hello! I am the automated desk assistant. Our master administrators have been notified of your message. We generally reply within 5 minutes. Feel free to leave details of your request here!'
+            });
+          await loadDashboardData();
+        } catch (err) {
+          console.error("Error inserting mock chat reply:", err);
+        }
+      }, 1800);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error sending chat message.');
+    }
   };
 
   // Clear all notifications
-  const handleClearNotifications = () => {
-    const allNots = getSavedNotifications();
-    const remaining = allNots.filter(n => n.userEmail !== user.email);
-    localStorage.setItem('musk_notifications', JSON.stringify(remaining));
-    setNotifications([]);
+  const handleClearNotifications = async () => {
+    try {
+      await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', user.id);
+      setNotifications([]);
+    } catch (err) {
+      console.error("Error clearing notifications:", err);
+    }
   };
 
   // Notification read marker
-  const handleMarkNotificationRead = (id: string) => {
-    const allNots = getSavedNotifications();
-    const updated = allNots.map(n => {
-      if (n.id === id) return { ...n, isRead: true };
-      return n;
-    });
-    localStorage.setItem('musk_notifications', JSON.stringify(updated));
-    setNotifications(updated.filter(n => n.userEmail === user.email));
+  const handleMarkNotificationRead = async (id: string) => {
+    try {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', id);
+      await loadDashboardData();
+    } catch (err) {
+      console.error("Error marking notification read:", err);
+    }
   };
 
   const sidebarItems = [

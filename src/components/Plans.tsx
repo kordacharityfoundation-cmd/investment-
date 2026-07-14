@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../utils/supabaseClient';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, Coins, ShieldCheck, ArrowRight, Check, Sparkles, 
@@ -33,57 +34,71 @@ export default function Plans({ user, onOpenAuth, onSelectPlan }: PlansProps) {
   const [paymentConfig, setPaymentConfig] = useState<any>({});
   const [qrConfig, setQrConfig] = useState<any>({});
 
-  // Initialize and load custom deposits list and dynamic configs
+  // Initialize and load custom deposits list and dynamic configs from Supabase
   useEffect(() => {
-    // Dynamically load plans from localStorage, or default to initial set
-    const savedPlans = localStorage.getItem('musk_plans');
-    if (savedPlans) {
+    const loadConfigAndPlans = async () => {
       try {
-        setInvestmentPlans(JSON.parse(savedPlans));
-      } catch (e) {
-        setInvestmentPlans(DEFAULT_PLANS_SEED);
+        // Fetch plans
+        const { data: plansData } = await supabase
+          .from('investment_plans')
+          .select('*')
+          .order('created_at', { ascending: true });
+        if (plansData && plansData.length > 0) {
+          setInvestmentPlans(plansData.map(p => ({
+            id: p.id,
+            name: p.name,
+            apr: Number(p.apr),
+            minDeposit: Number(p.min_deposit),
+            duration: Number(p.duration),
+            description: p.description,
+            badge: p.badge
+          })));
+        } else {
+          setInvestmentPlans(DEFAULT_PLANS_SEED);
+        }
+
+        // Fetch payment config
+        const { data: pay } = await supabase
+          .from('payment_config')
+          .select('*')
+          .eq('id', 1)
+          .single();
+        if (pay) {
+          setPaymentConfig({
+            bankName: pay.bank_name,
+            accountName: pay.account_name,
+            accountNumber: pay.account_number,
+            routingNumber: pay.routing_number,
+            btcAddress: pay.btc_address,
+            usdtTrcAddress: pay.usdt_trc_address,
+            usdtErcAddress: pay.usdt_erc_address,
+            showBank: true,
+            showBtc: true,
+            showTrc: true,
+            showErc: true
+          });
+        }
+
+        // Fetch QR config
+        const { data: qr } = await supabase
+          .from('qr_config')
+          .select('*')
+          .eq('id', 1)
+          .single();
+        if (qr) {
+          setQrConfig({
+            btcQr: qr.btc_qr,
+            usdtTrcQr: qr.usdt_trc_qr,
+            usdtErcQr: qr.usdt_erc_qr,
+            bankQr: qr.bank_qr
+          });
+        }
+      } catch (err) {
+        console.error("Error loading config/plans in Plans:", err);
       }
-    } else {
-      setInvestmentPlans(DEFAULT_PLANS_SEED);
-      localStorage.setItem('musk_plans', JSON.stringify(DEFAULT_PLANS_SEED));
-    }
+    };
 
-    // Load payment config
-    const savedPaymentConfig = localStorage.getItem('musk_payment_config');
-    if (savedPaymentConfig) {
-      try {
-        setPaymentConfig(JSON.parse(savedPaymentConfig));
-      } catch (e) {}
-    } else {
-      const defaultPay = {
-        bankName: 'Starbase Galactic Credit Union',
-        accountName: 'Musk Investment Corp',
-        accountNumber: '184-7392-1029',
-        routingNumber: '021000021',
-        btcAddress: '1MuSk77vXz8S8VPrAdAr8S73v48yPnC9E9',
-        usdtTrcAddress: 'TX9MuSkTRC20PlAtForMe198473210vY9s',
-        usdtErcAddress: '0x9a7bMuSkERC20F000de739D7Fbe41983021'
-      };
-      setPaymentConfig(defaultPay);
-      localStorage.setItem('musk_payment_config', JSON.stringify(defaultPay));
-    }
-
-    // Load QR config
-    const savedQrConfig = localStorage.getItem('musk_qr_config');
-    if (savedQrConfig) {
-      try {
-        setQrConfig(JSON.parse(savedQrConfig));
-      } catch (e) {}
-    } else {
-      const defaultQr = {
-        btcQr: 'default_btc',
-        usdtTrcQr: 'default_trc',
-        usdtErcQr: 'default_erc',
-        bankQr: 'default_bank'
-      };
-      setQrConfig(defaultQr);
-      localStorage.setItem('musk_qr_config', JSON.stringify(defaultQr));
-    }
+    loadConfigAndPlans();
   }, []);
 
   const DEFAULT_PLANS_SEED: InvestmentPlan[] = [
@@ -250,30 +265,40 @@ export default function Plans({ user, onOpenAuth, onSelectPlan }: PlansProps) {
   const [fileDragging, setFileDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize and load custom deposits list from LocalStorage for durable cloud-like persistence
+  // Initialize and load user deposits list from Supabase
   useEffect(() => {
-    const saved = localStorage.getItem('musk_deposits');
-    if (saved) {
-      try {
-        setDeposits(JSON.parse(saved));
-      } catch (e) {
-        setDeposits(getSeedDeposits());
-      }
-    } else {
-      const seeds = getSeedDeposits();
-      setDeposits(seeds);
-      localStorage.setItem('musk_deposits', JSON.stringify(seeds));
+    if (!user || !user.isLoggedIn) {
+      setDeposits([]);
+      return;
     }
-  }, []);
 
-  // Helper seed data to populate some historical status cards for Pending, Approved, Rejected
-  const getSeedDeposits = (): DepositTransaction[] => [];
+    const fetchUserDeposits = async () => {
+      try {
+        const { data: depData } = await supabase
+          .from('deposits')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        if (depData) {
+          setDeposits(depData.map(d => ({
+            id: d.id,
+            userEmail: d.user_email,
+            planId: d.plan_id,
+            planName: d.plan_id, // fallback to plan ID, or resolve names dynamically if needed
+            amount: Number(d.amount),
+            paymentMethod: d.payment_method,
+            status: d.status,
+            referenceNo: d.reference_no,
+            date: new Date(d.created_at).toISOString().replace('T', ' ').substring(0, 16)
+          })));
+        }
+      } catch (err) {
+        console.error("Error fetching deposits in Plans component:", err);
+      }
+    };
 
-  // Save deposits helper
-  const saveDeposits = (newDeposits: DepositTransaction[]) => {
-    setDeposits(newDeposits);
-    localStorage.setItem('musk_deposits', JSON.stringify(newDeposits));
-  };
+    fetchUserDeposits();
+  }, [user]);
 
   // Open modal / initialize portal parameters
   const handleSelectPlan = (plan: InvestmentPlan) => {
@@ -351,39 +376,77 @@ export default function Plans({ user, onOpenAuth, onSelectPlan }: PlansProps) {
   };
 
   // Submit payment handler
-  const handlePaymentSubmit = (e: React.FormEvent) => {
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlan || !chosenPaymentMethod) return;
+    if (!selectedPlan || !chosenPaymentMethod || !user) return;
 
-    // Build the new deposit history item
-    const newDeposit: DepositTransaction = {
-      id: `dep-${Date.now()}`,
-      planId: selectedPlan.id,
-      planName: selectedPlan.name,
-      amount: selectedPlan.minDeposit,
-      paymentMethod: chosenPaymentMethod.name,
-      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      status: 'Pending',
-      referenceNo: generatedRefNo,
-      transactionId: transactionId || undefined,
-      notes: additionalNotes || undefined,
-      screenshotUrl: screenshot || undefined,
-    };
+    try {
+      // 1. Insert deposit row into Supabase deposits table
+      const { error: depError } = await supabase
+        .from('deposits')
+        .insert({
+          user_id: user.id,
+          user_email: user.email.toLowerCase(),
+          plan_id: selectedPlan.id,
+          amount: selectedPlan.minDeposit,
+          payment_method: chosenPaymentMethod.name,
+          status: 'Pending',
+          reference_no: generatedRefNo,
+          transaction_id: transactionId || null,
+          notes: additionalNotes || null,
+          screenshot_url: screenshot || null
+        });
 
-    const updatedList = [newDeposit, ...deposits];
-    saveDeposits(updatedList);
-    setPortalStep('success');
-  };
-
-  // Direct action button simulation to approve/reject for visual completeness
-  const handleSimulateStatus = (id: string, nextStatus: 'Pending' | 'Approved' | 'Rejected') => {
-    const updated = deposits.map(dep => {
-      if (dep.id === id) {
-        return { ...dep, status: nextStatus };
+      if (depError) {
+        alert(depError.message);
+        return;
       }
-      return dep;
-    });
-    saveDeposits(updated);
+
+      // 2. Insert notification row into Supabase notifications table
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: user.id,
+          user_email: user.email.toLowerCase(),
+          title: 'Deposit Under Verification',
+          message: `Your deposit of $${selectedPlan.minDeposit.toLocaleString()} for the ${selectedPlan.name} is currently under administrative verification.`,
+          type: 'general'
+        });
+
+      // 3. Insert activity log row into Supabase activity_logs table
+      await supabase
+        .from('activity_logs')
+        .insert({
+          user_id: user.id,
+          user_email: user.email.toLowerCase(),
+          action: `Submitted deposit proof of $${selectedPlan.minDeposit.toLocaleString()} for ${selectedPlan.name}.`,
+          type: 'Deposit'
+        });
+
+      setPortalStep('success');
+
+      // Refresh deposits list
+      const { data: depData } = await supabase
+        .from('deposits')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (depData) {
+        setDeposits(depData.map(d => ({
+          id: d.id,
+          userEmail: d.user_email,
+          planId: d.plan_id,
+          planName: d.plan_id,
+          amount: Number(d.amount),
+          paymentMethod: d.payment_method,
+          status: d.status,
+          referenceNo: d.reference_no,
+          date: new Date(d.created_at).toISOString().replace('T', ' ').substring(0, 16)
+        })));
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error submitting deposit.');
+    }
   };
 
   return (
@@ -615,26 +678,6 @@ export default function Plans({ user, onOpenAuth, onSelectPlan }: PlansProps) {
                             {dep.status === 'Approved' && 'Your payment has been verified successfully.'}
                             {dep.status === 'Rejected' && 'Please review your payment details and try again.'}
                           </p>
-
-                          {/* Simulate interactive review panel */}
-                          <div className="flex justify-center sm:justify-end gap-1.5">
-                            <button
-                              id={`sim-approve-${dep.id}`}
-                              onClick={() => handleSimulateStatus(dep.id, 'Approved')}
-                              className="px-2 py-1 text-[9px] font-bold rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-all min-h-[22px]"
-                              title="Simulate Approval"
-                            >
-                              Sim Approve
-                            </button>
-                            <button
-                              id={`sim-reject-${dep.id}`}
-                              onClick={() => handleSimulateStatus(dep.id, 'Rejected')}
-                              className="px-2 py-1 text-[9px] font-bold rounded-md bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 transition-all min-h-[22px]"
-                              title="Simulate Rejection"
-                            >
-                              Sim Reject
-                            </button>
-                          </div>
                         </div>
                       </div>
                     </div>

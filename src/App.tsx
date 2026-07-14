@@ -1,4 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
+import { supabase } from './utils/supabaseClient';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Stats from './components/Stats';
@@ -18,19 +19,7 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  const [user, setUser] = useState<UserState | null>(() => {
-    // Check if user is logged in locally
-    const saved = localStorage.getItem('musk_user');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
-  });
-
+  const [user, setUser] = useState<UserState | null>(null);
   const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'deposit'>('landing');
   const [selectedPlanForDeposit, setSelectedPlanForDeposit] = useState<InvestmentPlan | null>(null);
 
@@ -42,17 +31,8 @@ export default function App() {
   });
 
   // Admin User state
-  const [adminUser, setAdminUser] = useState<UserState | null>(() => {
-    const saved = localStorage.getItem('musk_admin_user');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
-  });
+  const [adminUser, setAdminUser] = useState<UserState | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // Admin login states
   const [adminEmail, setAdminEmail] = useState('');
@@ -86,96 +66,116 @@ export default function App() {
     tab: 'login',
   });
 
-  // Redirect to dashboard on login/registration success
-  const handleAuthSuccess = (userData: UserState) => {
-    setUser(userData);
-    localStorage.setItem('musk_user', JSON.stringify(userData));
-    handleSetView('dashboard');
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('musk_user');
-    handleSetView('landing');
-  };
-
-  const handleAdminLogout = () => {
-    setAdminUser(null);
-    localStorage.removeItem('musk_admin_user');
-  };
-
-  // Synchronize and validate user/admin state when central database is loaded or updated
-  useEffect(() => {
-    const validateSessions = () => {
-      const savedUsersRaw = localStorage.getItem('musk_users');
-      if (!savedUsersRaw) return;
-
+  // Handles profile mapping and session validation helper
+  const handleAuthChange = async (session: any) => {
+    if (session?.user) {
       try {
-        const users = JSON.parse(savedUsersRaw);
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
 
-        // 1. Validate Regular User Session
-        const savedUser = localStorage.getItem('musk_user');
-        if (savedUser) {
-          const parsedUser = JSON.parse(savedUser);
-          const foundUser = users.find((u: any) => u.email === parsedUser.email);
-          
-          if (!foundUser) {
-            // User was deleted from database!
-            setUser(null);
-            localStorage.removeItem('musk_user');
-            alert('Your account session is invalid or has been deleted from the database.');
-            handleSetView('landing');
-          } else if (foundUser.status === 'Suspended') {
-            // User was suspended!
-            setUser(null);
-            localStorage.removeItem('musk_user');
-            alert('Your account has been suspended by an administrator.');
-            handleSetView('landing');
-          } else {
-            // Sync any profile updates (e.g. balance, role changes)
-            const nextState = { ...parsedUser, ...foundUser };
-            setUser(nextState);
-            localStorage.setItem('musk_user', JSON.stringify(nextState));
-          }
+        if (error || !profile) {
+          console.error("Error fetching user profile from Supabase on auth state change:", error);
+          setUser(null);
+          setAdminUser(null);
+          return;
         }
 
-        // 2. Validate Admin User Session
-        const savedAdmin = localStorage.getItem('musk_admin_user');
-        if (savedAdmin) {
-          const parsedAdmin = JSON.parse(savedAdmin);
-          const foundAdmin = users.find((u: any) => u.email === parsedAdmin.email);
-
-          if (!foundAdmin) {
-            // Admin was deleted from database!
-            setAdminUser(null);
-            localStorage.removeItem('musk_admin_user');
-            alert('Your administrator session has been deleted from the database.');
-          } else if (foundAdmin.role !== 'admin' || foundAdmin.status === 'Suspended') {
-            // Admin role revoked or suspended!
-            setAdminUser(null);
-            localStorage.removeItem('musk_admin_user');
-            alert('Your administrator privileges have been revoked.');
-          } else {
-            // Sync any admin details
-            const nextState = { ...parsedAdmin, ...foundAdmin };
-            setAdminUser(nextState);
-            localStorage.setItem('musk_admin_user', JSON.stringify(nextState));
-          }
+        if (profile.status === 'Suspended') {
+          alert('Your account has been suspended by an administrator.');
+          await supabase.auth.signOut();
+          setUser(null);
+          setAdminUser(null);
+          handleSetView('landing');
+          return;
         }
-      } catch (e) {
-        console.error("Error validating user/admin session:", e);
+
+        const mappedUser: UserState = {
+          id: profile.id,
+          isLoggedIn: true,
+          name: profile.name,
+          email: profile.email,
+          phone: profile.phone || '',
+          address: profile.address || '',
+          status: profile.status,
+          role: profile.role,
+          avatarSeed: profile.avatar_seed || 'default'
+        };
+
+        setUser(mappedUser);
+
+        if (profile.role === 'admin') {
+          setAdminUser(mappedUser);
+        } else {
+          setAdminUser(null);
+        }
+      } catch (err) {
+        console.error("Exception during session mapping:", err);
+        setUser(null);
+        setAdminUser(null);
+      }
+    } else {
+      setUser(null);
+      setAdminUser(null);
+    }
+  };
+
+  // Restore and listen to Supabase Sessions automatically
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        await handleAuthChange(session);
+      } catch (err) {
+        console.error("Failed to fetch initial Supabase session:", err);
+      } finally {
+        setAuthLoading(false);
       }
     };
 
-    // Run validation immediately on mount (once database sync has retrieved values)
-    validateSessions();
+    initializeAuth();
 
-    // Listen for background data updates
-    window.addEventListener('musk_db_updated', validateSessions);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      await handleAuthChange(session);
+    });
+
     return () => {
-      window.removeEventListener('musk_db_updated', validateSessions);
+      subscription.unsubscribe();
     };
   }, []);
+
+  // Redirect to dashboard on login/registration success
+  const handleAuthSuccess = (userData: UserState) => {
+    setUser(userData);
+    if (userData.role === 'admin') {
+      setAdminUser(userData);
+    }
+    handleSetView('dashboard');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error(e);
+    }
+    setUser(null);
+    setAdminUser(null);
+    handleSetView('landing');
+  };
+
+  const handleAdminLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error(e);
+    }
+    setUser(null);
+    setAdminUser(null);
+  };
+
 
   // Auto logout on inactivity (10 minutes)
   useEffect(() => {
@@ -283,51 +283,61 @@ export default function App() {
     setIsAdminRoute(false);
   };
 
-  const handleAdminLoginSubmit = (e: FormEvent) => {
+  const handleAdminLoginSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setAdminError('');
+    setAdminLoading(true);
 
     const trimmedEmail = adminEmail.trim().toLowerCase();
     const trimmedPassword = adminPassword.trim();
 
-    // Query registered users dynamically
-    const savedUsersRaw = localStorage.getItem('musk_users');
-    let usersList = [];
-    if (savedUsersRaw) {
-      try {
-        usersList = JSON.parse(savedUsersRaw);
-      } catch (err) {}
-    }
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password: trimmedPassword,
+      });
 
-    // Check if the user is in the database with matching email and password (trimmed)
-    const matchedUser = usersList.find((u: any) => 
-      u.email.trim().toLowerCase() === trimmedEmail && 
-      (u.password || '').trim() === trimmedPassword
-    );
-
-    const isAdminUser = !!matchedUser && (
-      matchedUser.role === 'admin' ||
-      matchedUser.isAdmin === true ||
-      matchedUser.name.toLowerCase().includes('admin') || 
-      matchedUser.email.toLowerCase().includes('admin')
-    );
-
-    if (isAdminUser && matchedUser) {
-      setAdminLoading(true);
-      setTimeout(() => {
+      if (error) {
+        setAdminError(error.message);
         setAdminLoading(false);
-        const adminName = matchedUser.name || 'Administrator';
-        const loggedAdmin: UserState = {
-          isLoggedIn: true,
-          name: adminName,
-          email: trimmedEmail,
-          avatarSeed: 'ADMIN'
-        };
-        setAdminUser(loggedAdmin);
-        localStorage.setItem('musk_admin_user', JSON.stringify(loggedAdmin));
-      }, 1000);
-    } else {
-      setAdminError('Invalid administrative key signature or unregistered gateway account.');
+        return;
+      }
+
+      if (data.user) {
+        // Query profile to check if role is admin
+        const { data: profile, error: profileErr } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileErr || !profile) {
+          await supabase.auth.signOut();
+          setAdminError('Unregistered gateway account or missing profile.');
+          setAdminLoading(false);
+          return;
+        }
+
+        if (profile.role !== 'admin') {
+          await supabase.auth.signOut();
+          setAdminError('Access denied: Unregistered gateway account.');
+          setAdminLoading(false);
+          return;
+        }
+
+        if (profile.status === 'Suspended') {
+          await supabase.auth.signOut();
+          setAdminError('Your administrator account has been suspended.');
+          setAdminLoading(false);
+          return;
+        }
+
+        // handleAuthChange will handle setting the state via onAuthStateChange
+      }
+    } catch (err: any) {
+      setAdminError(err.message || 'An unexpected error occurred during gateway link.');
+    } finally {
+      setAdminLoading(false);
     }
   };
 

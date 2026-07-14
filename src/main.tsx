@@ -2,17 +2,16 @@ import {StrictMode, useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import { initSync, startBackgroundSync } from './utils/sync';
 
 function Main() {
   const [synced, setSynced] = useState(false);
 
   useEffect(() => {
-    initSync().then(() => {
+    // Elegant minor delay to show the polished secure entry screen, then enter the app
+    const timer = setTimeout(() => {
       setSynced(true);
-      // Start background poll synchronization every 10 seconds to keep tabs/devices in sync
-      startBackgroundSync(10000);
-    });
+    }, 400);
+    return () => clearTimeout(timer);
   }, []);
 
   if (!synced) {

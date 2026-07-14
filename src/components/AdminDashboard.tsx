@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../utils/supabaseClient';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, TrendingUp, Download, Upload, Trash2, Edit2, Plus, Check, X, Menu,
@@ -8,10 +9,8 @@ import {
   Activity, Settings, LogOut
 } from 'lucide-react';
 import { 
-  getSavedUsers, getSavedWithdrawals, getSavedPlans, getSavedAnnouncements,
-  getPaymentConfig, getQrConfig, AdminUser, WithdrawalRequest, Announcement,
-  DEFAULT_PLANS, getSavedTickets, getSavedActivities, getSystemSettings,
-  logActivity, addNotification
+  AdminUser, WithdrawalRequest, Announcement,
+  DEFAULT_PLANS
 } from '../utils/db';
 import { InvestmentPlan } from '../types';
 import { DepositTransaction } from './Plans';
@@ -65,26 +64,189 @@ export default function AdminDashboard({ onLogout, adminEmail = 'admin@muskinves
   // Success / Action notification banners
   const [notice, setNotice] = useState({ text: '', type: 'success' });
 
-  // Sync data from LocalStorage
-  const syncDatabase = () => {
-    setUsersList(getSavedUsers());
-    setWithdrawalsList(getSavedWithdrawals());
-    setPlansList(getSavedPlans());
-    setAnnouncement(getSavedAnnouncements());
-    setPaymentConfig(getPaymentConfig());
-    setQrConfig(getQrConfig());
-    setTicketsList(getSavedTickets());
-    setActivitiesList(getSavedActivities());
-    setSystemSettingsState(getSystemSettings());
-
-    // Load deposits
-    const savedDeps = localStorage.getItem('musk_deposits');
-    if (savedDeps) {
-      try {
-        setDepositsList(JSON.parse(savedDeps));
-      } catch (e) {
-        setDepositsList([]);
+  // Sync data from Supabase Live Production Database
+  const syncDatabase = async () => {
+    try {
+      // 1. Fetch Users List (profiles)
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (profs) {
+        setUsersList(profs.map(p => ({
+          id: p.id,
+          name: p.name,
+          email: p.email,
+          phone: p.phone || '',
+          address: p.address || '',
+          status: p.status,
+          role: p.role,
+          dateCreated: new Date(p.created_at).toISOString().substring(0, 10),
+          avatarSeed: p.avatar_seed || 'default'
+        })));
       }
+
+      // 2. Fetch Deposits List
+      const { data: deps } = await supabase
+        .from('deposits')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (deps) {
+        setDepositsList(deps.map(d => ({
+          id: d.id,
+          userEmail: d.user_email,
+          planId: d.plan_id,
+          amount: Number(d.amount),
+          paymentMethod: d.payment_method,
+          status: d.status,
+          referenceNo: d.reference_no,
+          date: new Date(d.created_at).toISOString().replace('T', ' ').substring(0, 16)
+        })));
+      }
+
+      // 3. Fetch Withdrawals List
+      const { data: wths } = await supabase
+        .from('withdrawals')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (wths) {
+        setWithdrawalsList(wths.map(w => ({
+          id: w.id,
+          userEmail: w.user_email,
+          amount: Number(w.amount),
+          paymentMethod: w.payment_method,
+          addressDetails: w.address_details,
+          status: w.status,
+          referenceNo: w.reference_no,
+          date: new Date(w.created_at).toISOString().replace('T', ' ').substring(0, 16)
+        })));
+      }
+
+      // 4. Fetch Investment Plans
+      const { data: plans } = await supabase
+        .from('investment_plans')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (plans) {
+        setPlansList(plans.map(p => ({
+          id: p.id,
+          name: p.name,
+          apr: Number(p.apr),
+          minDeposit: Number(p.min_deposit),
+          duration: Number(p.duration),
+          description: p.description,
+          badge: p.badge
+        })));
+      }
+
+      // 5. Fetch Announcements
+      const { data: anns } = await supabase
+        .from('announcements')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (anns) {
+        setAnnouncement(anns.map(a => ({
+          id: a.id,
+          text: a.text,
+          category: a.category,
+          date: new Date(a.created_at).toISOString().replace('T', ' ').substring(0, 16)
+        })));
+      }
+
+      // 6. Fetch Payment Config
+      const { data: pay } = await supabase
+        .from('payment_config')
+        .select('*')
+        .eq('id', 1)
+        .single();
+      if (pay) {
+        setPaymentConfig({
+          bankName: pay.bank_name,
+          accountName: pay.account_name,
+          accountNumber: pay.account_number,
+          routingNumber: pay.routing_number,
+          btcAddress: pay.btc_address,
+          usdtTrcAddress: pay.usdt_trc_address,
+          usdtErcAddress: pay.usdt_erc_address,
+          showBank: true,
+          showBtc: true,
+          showTrc: true,
+          showErc: true
+        });
+      }
+
+      // 7. Fetch QR Config
+      const { data: qr } = await supabase
+        .from('qr_config')
+        .select('*')
+        .eq('id', 1)
+        .single();
+      if (qr) {
+        setQrConfig({
+          btcQr: qr.btc_qr,
+          usdtTrcQr: qr.usdt_trc_qr,
+          usdtErcQr: qr.usdt_erc_qr,
+          bankQr: qr.bank_qr
+        });
+      }
+
+      // 8. Fetch Tickets List
+      const { data: ticks } = await supabase
+        .from('support_tickets')
+        .select('*, ticket_replies(*)')
+        .order('created_at', { ascending: false });
+      if (ticks) {
+        setTicketsList(ticks.map(t => ({
+          id: t.id,
+          userEmail: t.user_email,
+          userName: t.user_name,
+          subject: t.subject,
+          category: t.category,
+          priority: t.priority,
+          message: t.message,
+          status: t.status,
+          date: new Date(t.created_at).toISOString().replace('T', ' ').substring(0, 16),
+          replies: (t.ticket_replies || []).map((r: any) => ({
+            id: r.id,
+            sender: r.sender,
+            senderName: r.sender_name,
+            message: r.message,
+            date: new Date(r.created_at).toISOString().replace('T', ' ').substring(0, 16)
+          })).sort((a: any, b: any) => a.date.localeCompare(b.date))
+        })));
+      }
+
+      // 9. Fetch Activities List
+      const { data: acts } = await supabase
+        .from('activity_logs')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (acts) {
+        setActivitiesList(acts.map(a => ({
+          id: a.id,
+          userEmail: a.user_email,
+          action: a.action,
+          type: a.type,
+          date: new Date(a.created_at).toISOString().replace('T', ' ').substring(0, 16)
+        })));
+      }
+
+      // 10. Fetch System Settings
+      const { data: sets } = await supabase
+        .from('system_settings')
+        .select('*')
+        .eq('id', 1)
+        .single();
+      if (sets) {
+        setSystemSettingsState({
+          siteName: sets.site_name,
+          maintenanceMode: sets.maintenance_mode,
+          compoundingRate: Number(sets.compounding_rate),
+          minimumWithdrawal: Number(sets.minimum_withdrawal)
+        });
+      }
+    } catch (err) {
+      console.error("Error syncing database in AdminDashboard:", err);
     }
   };
 
@@ -101,118 +263,269 @@ export default function AdminDashboard({ onLogout, adminEmail = 'admin@muskinves
   };
 
   // 1. User Account Status Control (Activate/Suspend)
-  const handleToggleUserStatus = (id: string, currentStatus: 'Active' | 'Suspended') => {
+  const handleToggleUserStatus = async (id: string, currentStatus: 'Active' | 'Suspended') => {
     const nextStatus = currentStatus === 'Active' ? 'Suspended' : 'Active';
-    const updated = usersList.map(u => {
-      if (u.id === id) {
-        return { ...u, status: nextStatus };
-      }
-      return u;
-    });
-    localStorage.setItem('musk_users', JSON.stringify(updated));
-    setUsersList(updated);
-    
-    const targetUser = usersList.find(u => u.id === id);
-    if (targetUser) {
-      logActivity(adminEmail, `Changed status of user ${targetUser.email} to ${nextStatus}`, 'Admin');
-      addNotification(targetUser.email, 'Account Status Updated', `Your investor account status has been updated to ${nextStatus} by our security compliance desk.`, 'general');
-    }
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: nextStatus })
+        .eq('id', id);
 
-    triggerNotice(`User account successfully ${nextStatus === 'Active' ? 'Activated' : 'Suspended'}.`);
+      if (error) {
+        triggerNotice(error.message, 'error');
+        return;
+      }
+
+      const targetUser = usersList.find(u => u.id === id);
+      if (targetUser) {
+        // Log activity
+        await supabase.from('activity_logs').insert({
+          user_id: id,
+          user_email: targetUser.email,
+          action: `Changed status of user ${targetUser.email} to ${nextStatus}`,
+          type: 'Admin'
+        });
+
+        // Add Notification
+        await supabase.from('notifications').insert({
+          user_id: id,
+          user_email: targetUser.email,
+          title: 'Account Status Updated',
+          message: `Your investor account status has been updated to ${nextStatus} by our security compliance desk.`,
+          type: 'general'
+        });
+      }
+
+      await syncDatabase();
+      triggerNotice(`User account successfully ${nextStatus === 'Active' ? 'Activated' : 'Suspended'}.`);
+    } catch (err: any) {
+      triggerNotice(err.message || 'Error updating user status.', 'error');
+    }
   };
 
-  const handleDeleteUserPermanently = (id: string) => {
+  const handleDeleteUserPermanently = async (id: string) => {
     const targetUser = usersList.find(u => u.id === id);
     if (!targetUser) return;
     
     if (confirm(`Are you sure you want to PERMANENTLY delete the investor account for ${targetUser.name} (${targetUser.email})?\nThis action is irreversible.`)) {
-      const updated = usersList.filter(u => u.id !== id);
-      localStorage.setItem('musk_users', JSON.stringify(updated));
-      setUsersList(updated);
-      
-      logActivity(adminEmail, `Permanently deleted user account for ${targetUser.email}`, 'Admin');
-      triggerNotice(`User account ${targetUser.email} has been permanently deleted.`, 'success');
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          triggerNotice(error.message, 'error');
+          return;
+        }
+
+        // Log action
+        await supabase.from('activity_logs').insert({
+          user_email: targetUser.email,
+          action: `Permanently deleted user account for ${targetUser.email}`,
+          type: 'Admin'
+        });
+
+        await syncDatabase();
+        triggerNotice(`User account ${targetUser.email} has been permanently deleted.`, 'success');
+      } catch (err: any) {
+        triggerNotice(err.message || 'Error deleting user account.', 'error');
+      }
     }
   };
 
   // 2. Deposit Approval Control
-  const handleApproveDeposit = (id: string) => {
+  const handleApproveDeposit = async (id: string) => {
     const targetDep = depositsList.find(d => d.id === id);
-    const updated = depositsList.map(dep => {
-      if (dep.id === id) {
-        return { ...dep, status: 'Approved' as const };
+    if (!targetDep) return;
+
+    try {
+      const { error } = await supabase
+        .from('deposits')
+        .update({ status: 'Approved' })
+        .eq('id', id);
+
+      if (error) {
+        triggerNotice(error.message, 'error');
+        return;
       }
-      return dep;
-    });
-    localStorage.setItem('musk_deposits', JSON.stringify(updated));
-    setDepositsList(updated);
 
-    if (targetDep) {
       const email = targetDep.userEmail || (targetDep as any).email || 'user@example.com';
-      logActivity(adminEmail, `Approved deposit request of $${targetDep.amount} (Ref: ${targetDep.referenceNo})`, 'Admin');
-      addNotification(email, 'Deposit Approved', `Your deposit of $${targetDep.amount} for the plan "${targetDep.planName}" has been approved. Your yield compounding cycle starts immediately.`, 'deposit_approved');
-    }
+      
+      // Log activity
+      await supabase.from('activity_logs').insert({
+        user_email: adminEmail,
+        action: `Approved deposit request of $${targetDep.amount} (Ref: ${targetDep.referenceNo})`,
+        type: 'Admin'
+      });
 
-    triggerNotice('Deposit validated and credited successfully.');
+      // Fetch user profile id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (profile) {
+        // Add notification
+        await supabase.from('notifications').insert({
+          user_id: profile.id,
+          user_email: email,
+          title: 'Deposit Approved',
+          message: `Your deposit of $${targetDep.amount} for the plan "${targetDep.planId}" has been approved. Your yield compounding cycle starts immediately.`,
+          type: 'deposit_approved'
+        });
+      }
+
+      await syncDatabase();
+      triggerNotice('Deposit validated and credited successfully.');
+    } catch (err: any) {
+      triggerNotice(err.message || 'Error approving deposit.', 'error');
+    }
   };
 
-  const handleRejectDeposit = (id: string) => {
+  const handleRejectDeposit = async (id: string) => {
     const targetDep = depositsList.find(d => d.id === id);
-    const updated = depositsList.map(dep => {
-      if (dep.id === id) {
-        return { ...dep, status: 'Rejected' as const };
+    if (!targetDep) return;
+
+    try {
+      const { error } = await supabase
+        .from('deposits')
+        .update({ status: 'Rejected' })
+        .eq('id', id);
+
+      if (error) {
+        triggerNotice(error.message, 'error');
+        return;
       }
-      return dep;
-    });
-    localStorage.setItem('musk_deposits', JSON.stringify(updated));
-    setDepositsList(updated);
 
-    if (targetDep) {
       const email = targetDep.userEmail || (targetDep as any).email || 'user@example.com';
-      logActivity(adminEmail, `Rejected deposit request of $${targetDep.amount} (Ref: ${targetDep.referenceNo})`, 'Admin');
-      addNotification(email, 'Deposit Rejected', `Your deposit of $${targetDep.amount} was rejected. Please open a support ticket or verify your receipt screenshot.`, 'deposit_rejected');
-    }
+      
+      // Log activity
+      await supabase.from('activity_logs').insert({
+        user_email: adminEmail,
+        action: `Rejected deposit request of $${targetDep.amount} (Ref: ${targetDep.referenceNo})`,
+        type: 'Admin'
+      });
 
-    triggerNotice('Deposit set to Rejected status.');
+      // Fetch user profile id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (profile) {
+        // Add notification
+        await supabase.from('notifications').insert({
+          user_id: profile.id,
+          user_email: email,
+          title: 'Deposit Rejected',
+          message: `Your deposit of $${targetDep.amount} was rejected. Please open a support ticket or verify your receipt screenshot.`,
+          type: 'deposit_rejected'
+        });
+      }
+
+      await syncDatabase();
+      triggerNotice('Deposit set to Rejected status.');
+    } catch (err: any) {
+      triggerNotice(err.message || 'Error rejecting deposit.', 'error');
+    }
   };
 
   // 3. Withdrawal Approval Control
-  const handleApproveWithdrawal = (id: string) => {
+  const handleApproveWithdrawal = async (id: string) => {
     const targetWth = withdrawalsList.find(w => w.id === id);
-    const updated = withdrawalsList.map(wth => {
-      if (wth.id === id) {
-        return { ...wth, status: 'Approved' as const };
+    if (!targetWth) return;
+
+    try {
+      const { error } = await supabase
+        .from('withdrawals')
+        .update({ status: 'Approved' })
+        .eq('id', id);
+
+      if (error) {
+        triggerNotice(error.message, 'error');
+        return;
       }
-      return wth;
-    });
-    localStorage.setItem('musk_withdrawals', JSON.stringify(updated));
-    setWithdrawalsList(updated);
 
-    if (targetWth) {
-      logActivity(adminEmail, `Approved withdrawal request of $${targetWth.amount} (Ref: ${targetWth.referenceNo})`, 'Admin');
-      addNotification(targetWth.userEmail, 'Withdrawal Completed', `Your withdrawal request of $${targetWth.amount} has been approved and processed. Funds have been sent to your designated wallet/account.`, 'withdrawal_approved');
+      // Log activity
+      await supabase.from('activity_logs').insert({
+        user_email: adminEmail,
+        action: `Approved withdrawal request of $${targetWth.amount} (Ref: ${targetWth.referenceNo})`,
+        type: 'Admin'
+      });
+
+      // Fetch user profile id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', targetWth.userEmail)
+        .single();
+
+      if (profile) {
+        // Add notification
+        await supabase.from('notifications').insert({
+          user_id: profile.id,
+          user_email: targetWth.userEmail,
+          title: 'Withdrawal Completed',
+          message: `Your withdrawal request of $${targetWth.amount} has been approved and processed. Funds have been sent to your designated wallet/account.`,
+          type: 'withdrawal_approved'
+        });
+      }
+
+      await syncDatabase();
+      triggerNotice('Withdrawal request approved and processed.');
+    } catch (err: any) {
+      triggerNotice(err.message || 'Error approving withdrawal.', 'error');
     }
-
-    triggerNotice('Withdrawal request approved and processed.');
   };
 
-  const handleRejectWithdrawal = (id: string) => {
+  const handleRejectWithdrawal = async (id: string) => {
     const targetWth = withdrawalsList.find(w => w.id === id);
-    const updated = withdrawalsList.map(wth => {
-      if (wth.id === id) {
-        return { ...wth, status: 'Rejected' as const };
+    if (!targetWth) return;
+
+    try {
+      const { error } = await supabase
+        .from('withdrawals')
+        .update({ status: 'Rejected' })
+        .eq('id', id);
+
+      if (error) {
+        triggerNotice(error.message, 'error');
+        return;
       }
-      return wth;
-    });
-    localStorage.setItem('musk_withdrawals', JSON.stringify(updated));
-    setWithdrawalsList(updated);
 
-    if (targetWth) {
-      logActivity(adminEmail, `Rejected withdrawal request of $${targetWth.amount} (Ref: ${targetWth.referenceNo})`, 'Admin');
-      addNotification(targetWth.userEmail, 'Withdrawal Rejected', `Your withdrawal request of $${targetWth.amount} was rejected. Please contact support or check your account dashboard details.`, 'withdrawal_rejected');
+      // Log activity
+      await supabase.from('activity_logs').insert({
+        user_email: adminEmail,
+        action: `Rejected withdrawal request of $${targetWth.amount} (Ref: ${targetWth.referenceNo})`,
+        type: 'Admin'
+      });
+
+      // Fetch user profile id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', targetWth.userEmail)
+        .single();
+
+      if (profile) {
+        // Add notification
+        await supabase.from('notifications').insert({
+          user_id: profile.id,
+          user_email: targetWth.userEmail,
+          title: 'Withdrawal Rejected',
+          message: `Your withdrawal request of $${targetWth.amount} was rejected. Please contact support or check your account dashboard details.`,
+          type: 'withdrawal_rejected'
+        });
+      }
+
+      await syncDatabase();
+      triggerNotice('Withdrawal request rejected.');
+    } catch (err: any) {
+      triggerNotice(err.message || 'Error rejecting withdrawal.', 'error');
     }
-
-    triggerNotice('Withdrawal request rejected.');
   };
 
   // 4. Manage Investment Plans
@@ -242,72 +555,136 @@ export default function AdminDashboard({ onLogout, adminEmail = 'admin@muskinves
     setShowPlanModal(true);
   };
 
-  const handleSavePlan = (e: React.FormEvent) => {
+  const handleSavePlan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!planForm.name.trim()) return;
 
-    let updatedPlans = [...plansList];
-
-    if (editingPlan) {
-      // Edit mode
-      updatedPlans = updatedPlans.map(p => {
-        if (p.id === editingPlan.id) {
-          return {
-            ...p,
+    try {
+      if (editingPlan) {
+        // Edit mode
+        const { error } = await supabase
+          .from('investment_plans')
+          .update({
             name: planForm.name,
             apr: Number(planForm.apr),
-            minDeposit: Number(planForm.minDeposit),
+            min_deposit: Number(planForm.minDeposit),
             duration: Number(planForm.duration),
             description: planForm.description,
             badge: planForm.badge
-          };
-        }
-        return p;
-      });
-      triggerNotice('Investment plan updated successfully.');
-    } else {
-      // Add mode
-      const newPlan: InvestmentPlan = {
-        id: `plan-${Date.now()}`,
-        name: planForm.name,
-        apr: Number(planForm.apr),
-        minDeposit: Number(planForm.minDeposit),
-        duration: Number(planForm.duration),
-        description: planForm.description,
-        badge: planForm.badge
-      };
-      updatedPlans.push(newPlan);
-      triggerNotice('New investment plan created successfully.');
-    }
+          })
+          .eq('id', editingPlan.id);
 
-    localStorage.setItem('musk_plans', JSON.stringify(updatedPlans));
-    setPlansList(updatedPlans);
-    setShowPlanModal(false);
+        if (error) {
+          triggerNotice(error.message, 'error');
+          return;
+        }
+        triggerNotice('Investment plan updated successfully.');
+      } else {
+        // Add mode
+        const { error } = await supabase
+          .from('investment_plans')
+          .insert({
+            name: planForm.name,
+            apr: Number(planForm.apr),
+            min_deposit: Number(planForm.minDeposit),
+            duration: Number(planForm.duration),
+            description: planForm.description,
+            badge: planForm.badge
+          });
+
+        if (error) {
+          triggerNotice(error.message, 'error');
+          return;
+        }
+        triggerNotice('New investment plan created successfully.');
+      }
+
+      await syncDatabase();
+      setShowPlanModal(false);
+    } catch (err: any) {
+      triggerNotice(err.message || 'Error saving plan.', 'error');
+    }
   };
 
-  const handleDeletePlan = (id: string) => {
+  const handleDeletePlan = async (id: string) => {
     if (confirm('Are you sure you want to delete this investment plan? Users will no longer see this node.')) {
-      const updated = plansList.filter(p => p.id !== id);
-      localStorage.setItem('musk_plans', JSON.stringify(updated));
-      setPlansList(updated);
-      triggerNotice('Investment plan deleted.');
+      try {
+        const { error } = await supabase
+          .from('investment_plans')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          triggerNotice(error.message, 'error');
+          return;
+        }
+
+        await syncDatabase();
+        triggerNotice('Investment plan deleted.');
+      } catch (err: any) {
+        triggerNotice(err.message || 'Error deleting plan.', 'error');
+      }
     }
   };
 
   // Restore default plans
-  const handleResetPlans = () => {
-    if (confirm('Restore the default suite of 10 industrial plans? This will overwrite changes.')) {
-      localStorage.setItem('musk_plans', JSON.stringify(DEFAULT_PLANS));
-      setPlansList(DEFAULT_PLANS);
-      triggerNotice('Default plans restored.');
+  const handleResetPlans = async () => {
+    if (confirm('Restore the default suite of industrial plans? This will overwrite changes.')) {
+      try {
+        await supabase.from('investment_plans').delete().neq('id', 'dummy');
+        
+        const mapped = DEFAULT_PLANS.map(p => ({
+          name: p.name,
+          apr: p.apr,
+          min_deposit: p.minDeposit,
+          duration: p.duration,
+          description: p.description,
+          badge: p.badge
+        }));
+
+        const { error } = await supabase
+          .from('investment_plans')
+          .insert(mapped);
+
+        if (error) {
+          triggerNotice(error.message, 'error');
+          return;
+        }
+
+        await syncDatabase();
+        triggerNotice('Default plans restored.');
+      } catch (err: any) {
+        triggerNotice(err.message || 'Error restoring plans.', 'error');
+      }
     }
   };
 
   // 5. Payment Methods Config Form
-  const handleUpdatePaymentConfig = (e: React.FormEvent) => {
+  const handleUpdatePaymentConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('musk_payment_config', JSON.stringify(paymentConfig));
-    triggerNotice('Payment gateway addresses updated. Users will see these details immediately.');
+    try {
+      const { error } = await supabase
+        .from('payment_config')
+        .update({
+          bank_name: paymentConfig.bankName,
+          account_name: paymentConfig.accountName,
+          account_number: paymentConfig.accountNumber,
+          routing_number: paymentConfig.routingNumber,
+          btc_address: paymentConfig.btcAddress,
+          usdt_trc_address: paymentConfig.usdtTrcAddress,
+          usdt_erc_address: paymentConfig.usdtErcAddress
+        })
+        .eq('id', 1);
+
+      if (error) {
+        triggerNotice(error.message, 'error');
+        return;
+      }
+
+      triggerNotice('Payment gateway addresses updated. Users will see these details immediately.');
+    } catch (err: any) {
+      triggerNotice(err.message || 'Error updating payment config.', 'error');
+    }
   };
 
   const handlePaymentConfigChange = (key: string, value: string) => {
@@ -318,29 +695,38 @@ export default function AdminDashboard({ onLogout, adminEmail = 'admin@muskinves
   };
 
   const handleToggleGateway = (key: string) => {
-    setPaymentConfig((prev: any) => {
-      const next = {
-        ...prev,
-        [key]: prev[key] === false ? true : false
-      };
-      localStorage.setItem('musk_payment_config', JSON.stringify(next));
-      return next;
-    });
-    triggerNotice('Gateway visibility status updated instantly.');
+    // Deprecated visibility toggle, handled natively via gateway addresses
+    triggerNotice('Gateway visibility status is determined by whether the address is provided.');
   };
 
   // 6. QR Code Image File Uploads
-  const handleQrUpload = (e: React.ChangeEvent<HTMLInputElement>, methodKey: string) => {
+  const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>, methodKey: string) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         if (event.target?.result) {
           const base64Data = event.target.result as string;
-          const updatedQr = { ...qrConfig, [methodKey]: base64Data };
-          localStorage.setItem('musk_qr_config', JSON.stringify(updatedQr));
-          setQrConfig(updatedQr);
-          triggerNotice(`New ${methodKey.toUpperCase()} QR code uploaded and synchronized.`);
+          try {
+            const dbKey = methodKey === 'btcQr' ? 'btc_qr' :
+                          methodKey === 'usdtTrcQr' ? 'usdt_trc_qr' :
+                          methodKey === 'usdtErcQr' ? 'usdt_erc_qr' : 'bank_qr';
+
+            const { error } = await supabase
+              .from('qr_config')
+              .update({ [dbKey]: base64Data })
+              .eq('id', 1);
+
+            if (error) {
+              triggerNotice(error.message, 'error');
+              return;
+            }
+
+            setQrConfig((prev: any) => ({ ...prev, [methodKey]: base64Data }));
+            triggerNotice(`New ${methodKey.toUpperCase()} QR code uploaded and synchronized.`);
+          } catch (err: any) {
+            triggerNotice(err.message || 'Error saving QR code.', 'error');
+          }
         }
       };
       reader.readAsDataURL(file);
@@ -348,122 +734,265 @@ export default function AdminDashboard({ onLogout, adminEmail = 'admin@muskinves
   };
 
   // Reset QR Codes to default state nodes
-  const handleResetQrs = () => {
+  const handleResetQrs = async () => {
     const defaultQrs = {
       btcQr: 'default_btc',
       usdtTrcQr: 'default_trc',
       usdtErcQr: 'default_erc',
       bankQr: 'default_bank'
     };
-    localStorage.setItem('musk_qr_config', JSON.stringify(defaultQrs));
-    setQrConfig(defaultQrs);
-    triggerNotice('QR configurations reset to standard placeholders.');
+    try {
+      const { error } = await supabase
+        .from('qr_config')
+        .update({
+          btc_qr: 'default_btc',
+          usdt_trc_qr: 'default_trc',
+          usdt_erc_qr: 'default_erc',
+          bank_qr: 'default_bank'
+        })
+        .eq('id', 1);
+
+      if (error) {
+        triggerNotice(error.message, 'error');
+        return;
+      }
+
+      setQrConfig(defaultQrs);
+      triggerNotice('QR configurations reset to standard placeholders.');
+    } catch (err: any) {
+      triggerNotice(err.message || 'Error resetting QR codes.', 'error');
+    }
   };
 
   // 7. Manage Announcements
-  const handleCreateAnnouncement = (e: React.FormEvent) => {
+  const handleCreateAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!announcementText.trim()) return;
 
-    const newAnn: Announcement = {
-      id: `ann-${Date.now()}`,
-      text: announcementText,
-      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      category: announcementCategory
-    };
+    try {
+      const { error } = await supabase
+        .from('announcements')
+        .insert({
+          text: announcementText,
+          category: announcementCategory
+        });
 
-    const updated = [newAnn, ...announcementsList];
-    localStorage.setItem('musk_announcements', JSON.stringify(updated));
-    setAnnouncement(updated);
-    setAnnouncementText('');
-    triggerNotice('Broadcast announcement deployed to all user hubs.');
+      if (error) {
+        triggerNotice(error.message, 'error');
+        return;
+      }
+
+      setAnnouncementText('');
+      await syncDatabase();
+      triggerNotice('Broadcast announcement deployed to all user hubs.');
+    } catch (err: any) {
+      triggerNotice(err.message || 'Error creating announcement.', 'error');
+    }
   };
 
-  const handleDeleteAnnouncement = (id: string) => {
-    const updated = announcementsList.filter(a => a.id !== id);
-    localStorage.setItem('musk_announcements', JSON.stringify(updated));
-    setAnnouncement(updated);
-    triggerNotice('Announcement removed.');
-    logActivity(adminEmail, `Deleted system announcement ID: ${id}`, 'Admin');
+  const handleDeleteAnnouncement = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('announcements')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        triggerNotice(error.message, 'error');
+        return;
+      }
+
+      await syncDatabase();
+      triggerNotice('Announcement removed.');
+      
+      // Log activity
+      await supabase.from('activity_logs').insert({
+        user_email: adminEmail,
+        action: `Deleted system announcement ID: ${id}`,
+        type: 'Admin'
+      });
+    } catch (err: any) {
+      triggerNotice(err.message || 'Error deleting announcement.', 'error');
+    }
   };
 
   // Support Ticket reply & resolve
-  const handleReplyTicketAdmin = (ticketId: string, customStatus?: 'Resolved' | 'Closed') => {
+  const handleReplyTicketAdmin = async (ticketId: string, customStatus?: 'Resolved' | 'Closed') => {
     const replyText = ticketReplyTexts[ticketId] || '';
     if (!replyText.trim() && !customStatus) return;
 
-    const saved = getSavedTickets();
-    const updated = saved.map(t => {
-      if (t.id === ticketId) {
-        const replies = [...t.replies];
-        if (replyText.trim()) {
-          replies.push({
-            id: `rep-${Date.now()}`,
-            sender: 'admin' as const,
-            senderName: 'System Core Admin',
-            message: replyText,
-            date: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    try {
+      if (replyText.trim()) {
+        const { error: replyErr } = await supabase
+          .from('ticket_replies')
+          .insert({
+            ticket_id: ticketId,
+            sender: 'admin',
+            sender_name: 'System Core Admin',
+            message: replyText
+          });
+
+        if (replyErr) {
+          triggerNotice(replyErr.message, 'error');
+          return;
+        }
+      }
+
+      const { error: statusErr } = await supabase
+        .from('support_tickets')
+        .update({ status: customStatus || 'Pending' })
+        .eq('id', ticketId);
+
+      if (statusErr) {
+        triggerNotice(statusErr.message, 'error');
+        return;
+      }
+
+      setTicketReplyTexts(prev => ({ ...prev, [ticketId]: '' }));
+
+      const targetTicket = ticketsList.find(t => t.id === ticketId);
+      if (targetTicket) {
+        // Log action
+        await supabase.from('activity_logs').insert({
+          user_email: adminEmail,
+          action: `Replied to ticket: "${targetTicket.subject}"`,
+          type: 'Admin'
+        });
+
+        // Fetch user profile id
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', targetTicket.userEmail)
+          .single();
+
+        if (profile) {
+          // Add notification
+          await supabase.from('notifications').insert({
+            user_id: profile.id,
+            user_email: targetTicket.userEmail,
+            title: 'Support Ticket Response',
+            message: `An administrator has replied to your ticket: "${targetTicket.subject}".`,
+            type: 'general'
           });
         }
-        return {
-          ...t,
-          status: customStatus || ('Pending' as const),
-          replies
-        };
       }
-      return t;
-    });
 
-    localStorage.setItem('musk_tickets', JSON.stringify(updated));
-    setTicketsList(updated);
-    setTicketReplyTexts(prev => ({ ...prev, [ticketId]: '' }));
-    
-    // Find ticket user
-    const targetTicket = saved.find(t => t.id === ticketId);
-    if (targetTicket) {
-      logActivity(adminEmail, `Replied to ticket: "${targetTicket.subject}"`, 'Admin');
-      addNotification(targetTicket.userEmail, 'Support Ticket Response', `An administrator has replied to your ticket: "${targetTicket.subject}".`, 'general');
+      await syncDatabase();
+      triggerNotice('Support response dispatched successfully.');
+    } catch (err: any) {
+      triggerNotice(err.message || 'Error sending reply.', 'error');
     }
-    
-    triggerNotice('Support response dispatched successfully.');
   };
 
-  const handleResolveTicket = (ticketId: string) => {
-    const saved = getSavedTickets();
-    const updated = saved.map(t => {
-      if (t.id === ticketId) {
-        return { ...t, status: 'Resolved' as const };
+  const handleResolveTicket = async (ticketId: string) => {
+    try {
+      const { error } = await supabase
+        .from('support_tickets')
+        .update({ status: 'Resolved' })
+        .eq('id', ticketId);
+
+      if (error) {
+        triggerNotice(error.message, 'error');
+        return;
       }
-      return t;
-    });
-    localStorage.setItem('musk_tickets', JSON.stringify(updated));
-    setTicketsList(updated);
-    
-    const targetTicket = saved.find(t => t.id === ticketId);
-    if (targetTicket) {
-      logActivity(adminEmail, `Resolved support ticket ID: ${ticketId}`, 'Admin');
-      addNotification(targetTicket.userEmail, 'Support Ticket Resolved', `Your ticket "${targetTicket.subject}" has been marked as resolved.`, 'general');
+
+      const targetTicket = ticketsList.find(t => t.id === ticketId);
+      if (targetTicket) {
+        // Log activity
+        await supabase.from('activity_logs').insert({
+          user_email: adminEmail,
+          action: `Resolved support ticket ID: ${ticketId}`,
+          type: 'Admin'
+        });
+
+        // Fetch user profile id
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', targetTicket.userEmail)
+          .single();
+
+        if (profile) {
+          // Add notification
+          await supabase.from('notifications').insert({
+            user_id: profile.id,
+            user_email: targetTicket.userEmail,
+            title: 'Support Ticket Resolved',
+            message: `Your ticket "${targetTicket.subject}" has been marked as resolved.`,
+            type: 'general'
+          });
+        }
+      }
+
+      await syncDatabase();
+      triggerNotice('Support ticket marked as Resolved.');
+    } catch (err: any) {
+      triggerNotice(err.message || 'Error resolving ticket.', 'error');
     }
-    triggerNotice('Support ticket marked as Resolved.');
   };
 
   // Delete User Account
-  const handleDeleteUser = (id: string) => {
+  const handleDeleteUser = async (id: string) => {
     if (confirm('CRITICAL ACTION: Are you sure you want to permanently delete this investor account and purge their transactions? This cannot be undone.')) {
-      const updated = usersList.filter(u => u.id !== id);
-      localStorage.setItem('musk_users', JSON.stringify(updated));
-      setUsersList(updated);
-      logActivity(adminEmail, `Deleted user account ID: ${id}`, 'Admin');
-      triggerNotice('Investor record permanently purged.');
+      try {
+        const targetUser = usersList.find(u => u.id === id);
+        const { error } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          triggerNotice(error.message, 'error');
+          return;
+        }
+
+        if (targetUser) {
+          await supabase.from('activity_logs').insert({
+            user_email: adminEmail,
+            action: `Deleted user account ID: ${id} (${targetUser.email})`,
+            type: 'Admin'
+          });
+        }
+
+        await syncDatabase();
+        triggerNotice('Investor record permanently purged.');
+      } catch (err: any) {
+        triggerNotice(err.message || 'Error deleting user record.', 'error');
+      }
     }
   };
 
   // Save System settings
-  const handleUpdateSystemSettings = (e: React.FormEvent) => {
+  const handleUpdateSystemSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('musk_system_settings', JSON.stringify(systemSettings));
-    logActivity(adminEmail, 'Modified global system status and maintenance metrics', 'Admin');
-    triggerNotice('Global website parameters updated instantly.');
+    try {
+      const { error } = await supabase
+        .from('system_settings')
+        .update({
+          site_name: systemSettings.siteName,
+          maintenance_mode: systemSettings.maintenanceMode,
+          compounding_rate: Number(systemSettings.compoundingRate),
+          minimum_withdrawal: Number(systemSettings.minimumWithdrawal)
+        })
+        .eq('id', 1);
+
+      if (error) {
+        triggerNotice(error.message, 'error');
+        return;
+      }
+
+      // Log activity
+      await supabase.from('activity_logs').insert({
+        user_email: adminEmail,
+        action: 'Modified global system status and maintenance metrics',
+        type: 'Admin'
+      });
+
+      triggerNotice('Global website parameters updated instantly.');
+    } catch (err: any) {
+      triggerNotice(err.message || 'Error updating system settings.', 'error');
+    }
   };
 
   // Filtering lists

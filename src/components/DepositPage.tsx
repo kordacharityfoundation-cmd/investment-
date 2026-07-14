@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../utils/supabaseClient';
 import { motion } from 'motion/react';
 import { 
   TrendingUp, Coins, ShieldCheck, ArrowRight, Check, Sparkles, 
@@ -30,63 +31,76 @@ export default function DepositPage({ user, initialSelectedPlan, onBackToDashboa
   const [fileDragging, setFileDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load plans, configurations, and state
+  // Load plans, configurations, and state from Supabase
   useEffect(() => {
-    // Load plans
-    const savedPlans = localStorage.getItem('musk_plans');
-    if (savedPlans) {
+    const loadConfigAndData = async () => {
       try {
-        setPlans(JSON.parse(savedPlans));
-        if (!selectedPlan && JSON.parse(savedPlans).length > 0) {
-          setSelectedPlan(JSON.parse(savedPlans)[0]);
+        // Fetch plans
+        const { data: plansData } = await supabase
+          .from('investment_plans')
+          .select('*')
+          .order('created_at', { ascending: true });
+        if (plansData && plansData.length > 0) {
+          const mappedPlans = plansData.map(p => ({
+            id: p.id,
+            name: p.name,
+            apr: Number(p.apr),
+            minDeposit: Number(p.min_deposit),
+            duration: Number(p.duration),
+            description: p.description,
+            badge: p.badge
+          }));
+          setPlans(mappedPlans);
+          if (!selectedPlan) {
+            setSelectedPlan(mappedPlans[0]);
+          }
+        } else {
+          setPlans(DEFAULT_PLANS);
+          if (!selectedPlan) setSelectedPlan(DEFAULT_PLANS[0]);
         }
-      } catch (e) {
-        setPlans(DEFAULT_PLANS);
-        if (!selectedPlan) setSelectedPlan(DEFAULT_PLANS[0]);
+
+        // Fetch payment config
+        const { data: pay } = await supabase
+          .from('payment_config')
+          .select('*')
+          .eq('id', 1)
+          .single();
+        if (pay) {
+          setPaymentConfig({
+            bankName: pay.bank_name,
+            accountName: pay.account_name,
+            accountNumber: pay.account_number,
+            routingNumber: pay.routing_number,
+            btcAddress: pay.btc_address,
+            usdtTrcAddress: pay.usdt_trc_address,
+            usdtErcAddress: pay.usdt_erc_address,
+            showBank: true,
+            showBtc: true,
+            showTrc: true,
+            showErc: true
+          });
+        }
+
+        // Fetch QR config
+        const { data: qr } = await supabase
+          .from('qr_config')
+          .select('*')
+          .eq('id', 1)
+          .single();
+        if (qr) {
+          setQrConfig({
+            btcQr: qr.btc_qr,
+            usdtTrcQr: qr.usdt_trc_qr,
+            usdtErcQr: qr.usdt_erc_qr,
+            bankQr: qr.bank_qr
+          });
+        }
+      } catch (err) {
+        console.error("Error loading config/plans in DepositPage:", err);
       }
-    } else {
-      setPlans(DEFAULT_PLANS);
-      localStorage.setItem('musk_plans', JSON.stringify(DEFAULT_PLANS));
-      if (!selectedPlan) setSelectedPlan(DEFAULT_PLANS[0]);
-    }
+    };
 
-    // Load payment config
-    const savedPaymentConfig = localStorage.getItem('musk_payment_config');
-    if (savedPaymentConfig) {
-      try {
-        setPaymentConfig(JSON.parse(savedPaymentConfig));
-      } catch (e) {}
-    } else {
-      const defaultPay = {
-        bankName: 'Starbase Galactic Credit Union',
-        accountName: 'Musk Investment Corp',
-        accountNumber: '184-7392-1029',
-        routingNumber: '021000021',
-        btcAddress: '1MuSk77vXz8S8VPrAdAr8S73v48yPnC9E9',
-        usdtTrcAddress: 'TX9MuSkTRC20PlAtForMe198473210vY9s',
-        usdtErcAddress: '0x9a7bMuSkERC20F000de739D7Fbe41983021'
-      };
-      setPaymentConfig(defaultPay);
-      localStorage.setItem('musk_payment_config', JSON.stringify(defaultPay));
-    }
-
-    // Load QR config
-    const savedQrConfig = localStorage.getItem('musk_qr_config');
-    if (savedQrConfig) {
-      try {
-        setQrConfig(JSON.parse(savedQrConfig));
-      } catch (e) {}
-    } else {
-      const defaultQr = {
-        btcQr: '',
-        usdtTrcQr: '',
-        usdtErcQr: '',
-        bankQr: ''
-      };
-      setQrConfig(defaultQr);
-      localStorage.setItem('musk_qr_config', JSON.stringify(defaultQr));
-    }
-
+    loadConfigAndData();
     setGeneratedRefNo(`MSK-${Math.floor(10000 + Math.random() * 90000)}-DEP`);
   }, []);
 
@@ -229,83 +243,57 @@ export default function DepositPage({ user, initialSelectedPlan, onBackToDashboa
     }
   };
 
-  const handlePaymentSubmit = (e: React.FormEvent) => {
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlan || !chosenPaymentMethod) return;
 
-    // Create deposit
-    const newDeposit: DepositTransaction = {
-      id: `dep-${Date.now()}`,
-      planId: selectedPlan.id,
-      planName: selectedPlan.name,
-      amount: selectedPlan.minDeposit,
-      paymentMethod: chosenPaymentMethod.name,
-      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      status: 'Pending',
-      referenceNo: generatedRefNo,
-      transactionId: transactionId || undefined,
-      notes: additionalNotes || undefined,
-      screenshotUrl: screenshot || undefined,
-    };
+    try {
+      // 1. Insert deposit row into Supabase deposits table
+      const { error: depError } = await supabase
+        .from('deposits')
+        .insert({
+          user_id: user.id,
+          user_email: user.email.toLowerCase(),
+          plan_id: selectedPlan.id,
+          amount: selectedPlan.minDeposit,
+          payment_method: chosenPaymentMethod.name,
+          status: 'Pending',
+          reference_no: generatedRefNo,
+          transaction_id: transactionId || null,
+          notes: additionalNotes || null,
+          screenshot_url: screenshot || null
+        });
 
-    // Retrieve active user's deposits and save
-    const currentDepositsStr = localStorage.getItem('musk_deposits');
-    let currentDeposits: DepositTransaction[] = [];
-    if (currentDepositsStr) {
-      try {
-        currentDeposits = JSON.parse(currentDepositsStr);
-      } catch (err) {}
+      if (depError) {
+        alert(depError.message);
+        return;
+      }
+
+      // 2. Insert notification row into Supabase notifications table
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: user.id,
+          user_email: user.email.toLowerCase(),
+          title: 'Deposit Under Verification',
+          message: `Your deposit of $${selectedPlan.minDeposit.toLocaleString()} for the ${selectedPlan.name} is currently under administrative verification.`,
+          type: 'general'
+        });
+
+      // 3. Insert activity log row into Supabase activity_logs table
+      await supabase
+        .from('activity_logs')
+        .insert({
+          user_id: user.id,
+          user_email: user.email.toLowerCase(),
+          action: `Submitted deposit proof of $${selectedPlan.minDeposit.toLocaleString()} for ${selectedPlan.name}.`,
+          type: 'Deposit'
+        });
+
+      setPortalStep('success');
+    } catch (err: any) {
+      alert(err.message || 'Error submitting deposit.');
     }
-
-    // Attach user email for rigorous backend filtering
-    const depositWithUser = {
-      ...newDeposit,
-      userEmail: user.email.toLowerCase()
-    };
-
-    const updatedDeposits = [depositWithUser, ...currentDeposits];
-    localStorage.setItem('musk_deposits', JSON.stringify(updatedDeposits));
-
-    // Send Real dynamic notification
-    const notificationId = `notif-${Date.now()}`;
-    const newNotification = {
-      id: notificationId,
-      userEmail: user.email.toLowerCase(),
-      title: 'Deposit Under Verification',
-      text: `Your deposit of $${selectedPlan.minDeposit.toLocaleString()} for the ${selectedPlan.name} is currently under administrative verification.`,
-      date: new Date().toLocaleString(),
-      isRead: false
-    };
-
-    const existingNotifsStr = localStorage.getItem('musk_notifications');
-    let existingNotifs = [];
-    if (existingNotifsStr) {
-      try {
-        existingNotifs = JSON.parse(existingNotifsStr);
-      } catch (err) {}
-    }
-    localStorage.setItem('musk_notifications', JSON.stringify([newNotification, ...existingNotifs]));
-
-    // Log dynamic activity audit
-    const activityId = `act-${Date.now()}`;
-    const newActivity = {
-      id: activityId,
-      userEmail: user.email.toLowerCase(),
-      text: `Submitted deposit proof of $${selectedPlan.minDeposit.toLocaleString()} for ${selectedPlan.name}.`,
-      date: new Date().toLocaleString(),
-      type: 'Deposit'
-    };
-
-    const existingActsStr = localStorage.getItem('musk_activities');
-    let existingActs = [];
-    if (existingActsStr) {
-      try {
-        existingActs = JSON.parse(existingActsStr);
-      } catch (err) {}
-    }
-    localStorage.setItem('musk_activities', JSON.stringify([newActivity, ...existingActs]));
-
-    setPortalStep('success');
   };
 
   return (

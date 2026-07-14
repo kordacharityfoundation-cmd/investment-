@@ -25,8 +25,13 @@ export interface Statistic {
 }
 
 export interface UserState {
+  id?: string;
   isLoggedIn: boolean;
   name: string;
   email: string;
   avatarSeed: string;
+  role?: string;
+  phone?: string;
+  address?: string;
+  status?: string;
 }
