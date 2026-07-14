@@ -148,16 +148,6 @@ export const DEFAULT_PLANS: InvestmentPlan[] = [
 // Default users
 export const DEFAULT_USERS: AdminUser[] = [
   {
-    id: 'user-1',
-    name: 'Elon Musk',
-    email: 'elon@tesla.com',
-    phone: '+1 (555) 420-6969',
-    address: '1 Starbase Blvd, Boca Chica, TX',
-    status: 'Active',
-    dateCreated: '2026-06-01',
-    password: 'password123'
-  },
-  {
     id: 'user-2',
     name: 'Charity Admin',
     email: 'kordacharityfoundation@gmail.com',
@@ -166,26 +156,6 @@ export const DEFAULT_USERS: AdminUser[] = [
     status: 'Active',
     dateCreated: '2026-07-01',
     password: '#Deemainzino1'
-  },
-  {
-    id: 'user-3',
-    name: 'Gwynne Shotwell',
-    email: 'gwynne@spacex.com',
-    phone: '+1 (555) 987-6543',
-    address: 'SpaceX HQ, Hawthorne, CA',
-    status: 'Active',
-    dateCreated: '2026-06-15',
-    password: 'password123'
-  },
-  {
-    id: 'user-4',
-    name: 'Starbase Intern',
-    email: 'starbase_intern@spacex.com',
-    phone: '+1 (555) 123-4567',
-    address: 'Mars Launch Site, Boca Chica, TX',
-    status: 'Suspended',
-    dateCreated: '2026-07-05',
-    password: 'password123'
   }
 ];
 
@@ -316,9 +286,28 @@ export function initializeDatabase() {
   if (!localStorage.getItem('musk_plans')) {
     localStorage.setItem('musk_plans', JSON.stringify(DEFAULT_PLANS));
   }
-  if (!localStorage.getItem('musk_users')) {
+  
+  const existingUsersRaw = localStorage.getItem('musk_users');
+  if (!existingUsersRaw) {
     localStorage.setItem('musk_users', JSON.stringify(DEFAULT_USERS));
+  } else {
+    // Proactive auto-cleanup: If there are demo users in the cached list, filter them out!
+    try {
+      const parsedUsers = JSON.parse(existingUsersRaw);
+      if (Array.isArray(parsedUsers)) {
+        const demoEmails = ['elon@tesla.com', 'gwynne@spacex.com', 'starbase_intern@spacex.com'];
+        const cleanUsers = parsedUsers.filter((u: any) => u && u.email && !demoEmails.includes(u.email));
+        
+        if (cleanUsers.length !== parsedUsers.length) {
+          console.log(`[Auto-Cleanup] Purging ${parsedUsers.length - cleanUsers.length} demo users from local storage cache.`);
+          localStorage.setItem('musk_users', JSON.stringify(cleanUsers));
+        }
+      }
+    } catch (e) {
+      console.error("Error running auto-cleanup on cached users:", e);
+    }
   }
+
   if (!localStorage.getItem('musk_announcements')) {
     localStorage.setItem('musk_announcements', JSON.stringify(DEFAULT_ANNOUNCEMENTS));
   }

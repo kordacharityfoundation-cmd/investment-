@@ -208,6 +208,13 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
+-- N. App Central Key-Value Store Table (Used by the server-side sync manager)
+CREATE TABLE IF NOT EXISTS public.musk_app_store (
+    key VARCHAR(255) PRIMARY KEY,
+    value JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
 -- ============================================================================
 -- 3. INDEXES FOR QUERY OPTIMIZATION (Using IF NOT EXISTS)
 -- ============================================================================

@@ -148,7 +148,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
     setDepositsList(updated);
 
     if (targetDep) {
-      const email = targetDep.userEmail || (targetDep as any).email || 'elon@tesla.com';
+      const email = targetDep.userEmail || (targetDep as any).email || 'user@example.com';
       logActivity('admin@muskinvestment.com', `Approved deposit request of $${targetDep.amount} (Ref: ${targetDep.referenceNo})`, 'Admin');
       addNotification(email, 'Deposit Approved', `Your deposit of $${targetDep.amount} for the plan "${targetDep.planName}" has been approved. Your yield compounding cycle starts immediately.`, 'deposit_approved');
     }
@@ -168,7 +168,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
     setDepositsList(updated);
 
     if (targetDep) {
-      const email = targetDep.userEmail || (targetDep as any).email || 'elon@tesla.com';
+      const email = targetDep.userEmail || (targetDep as any).email || 'user@example.com';
       logActivity('admin@muskinvestment.com', `Rejected deposit request of $${targetDep.amount} (Ref: ${targetDep.referenceNo})`, 'Admin');
       addNotification(email, 'Deposit Rejected', `Your deposit of $${targetDep.amount} was rejected. Please open a support ticket or verify your receipt screenshot.`, 'deposit_rejected');
     }
