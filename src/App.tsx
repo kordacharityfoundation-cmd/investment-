@@ -104,39 +104,76 @@ export default function App() {
     localStorage.removeItem('musk_admin_user');
   };
 
-  // Synchronize state when central database is updated by other clients in background
+  // Synchronize and validate user/admin state when central database is loaded or updated
   useEffect(() => {
-    const handleDbUpdated = () => {
-      const saved = localStorage.getItem('musk_user');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          const savedUsersRaw = localStorage.getItem('musk_users');
-          if (savedUsersRaw) {
-            const users = JSON.parse(savedUsersRaw);
-            const latest = users.find((u: any) => u.email === parsed.email);
-            if (latest) {
-              if (latest.status === 'Suspended' && parsed.status !== 'Suspended') {
-                setUser(null);
-                localStorage.removeItem('musk_user');
-                alert('Your account has been suspended by an administrator.');
-                handleSetView('landing');
-                return;
-              }
-              const nextState = { ...parsed, ...latest };
-              setUser(nextState);
-              localStorage.setItem('musk_user', JSON.stringify(nextState));
-            }
+    const validateSessions = () => {
+      const savedUsersRaw = localStorage.getItem('musk_users');
+      if (!savedUsersRaw) return;
+
+      try {
+        const users = JSON.parse(savedUsersRaw);
+
+        // 1. Validate Regular User Session
+        const savedUser = localStorage.getItem('musk_user');
+        if (savedUser) {
+          const parsedUser = JSON.parse(savedUser);
+          const foundUser = users.find((u: any) => u.email === parsedUser.email);
+          
+          if (!foundUser) {
+            // User was deleted from database!
+            setUser(null);
+            localStorage.removeItem('musk_user');
+            alert('Your account session is invalid or has been deleted from the database.');
+            handleSetView('landing');
+          } else if (foundUser.status === 'Suspended') {
+            // User was suspended!
+            setUser(null);
+            localStorage.removeItem('musk_user');
+            alert('Your account has been suspended by an administrator.');
+            handleSetView('landing');
+          } else {
+            // Sync any profile updates (e.g. balance, role changes)
+            const nextState = { ...parsedUser, ...foundUser };
+            setUser(nextState);
+            localStorage.setItem('musk_user', JSON.stringify(nextState));
           }
-        } catch (e) {
-          console.error(e);
         }
+
+        // 2. Validate Admin User Session
+        const savedAdmin = localStorage.getItem('musk_admin_user');
+        if (savedAdmin) {
+          const parsedAdmin = JSON.parse(savedAdmin);
+          const foundAdmin = users.find((u: any) => u.email === parsedAdmin.email);
+
+          if (!foundAdmin) {
+            // Admin was deleted from database!
+            setAdminUser(null);
+            localStorage.removeItem('musk_admin_user');
+            alert('Your administrator session has been deleted from the database.');
+          } else if (foundAdmin.role !== 'admin' || foundAdmin.status === 'Suspended') {
+            // Admin role revoked or suspended!
+            setAdminUser(null);
+            localStorage.removeItem('musk_admin_user');
+            alert('Your administrator privileges have been revoked.');
+          } else {
+            // Sync any admin details
+            const nextState = { ...parsedAdmin, ...foundAdmin };
+            setAdminUser(nextState);
+            localStorage.setItem('musk_admin_user', JSON.stringify(nextState));
+          }
+        }
+      } catch (e) {
+        console.error("Error validating user/admin session:", e);
       }
     };
 
-    window.addEventListener('musk_db_updated', handleDbUpdated);
+    // Run validation immediately on mount (once database sync has retrieved values)
+    validateSessions();
+
+    // Listen for background data updates
+    window.addEventListener('musk_db_updated', validateSessions);
     return () => {
-      window.removeEventListener('musk_db_updated', handleDbUpdated);
+      window.removeEventListener('musk_db_updated', validateSessions);
     };
   }, []);
 
