@@ -104,6 +104,42 @@ export default function App() {
     localStorage.removeItem('musk_admin_user');
   };
 
+  // Synchronize state when central database is updated by other clients in background
+  useEffect(() => {
+    const handleDbUpdated = () => {
+      const saved = localStorage.getItem('musk_user');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const savedUsersRaw = localStorage.getItem('musk_users');
+          if (savedUsersRaw) {
+            const users = JSON.parse(savedUsersRaw);
+            const latest = users.find((u: any) => u.email === parsed.email);
+            if (latest) {
+              if (latest.status === 'Suspended' && parsed.status !== 'Suspended') {
+                setUser(null);
+                localStorage.removeItem('musk_user');
+                alert('Your account has been suspended by an administrator.');
+                handleSetView('landing');
+                return;
+              }
+              const nextState = { ...parsed, ...latest };
+              setUser(nextState);
+              localStorage.setItem('musk_user', JSON.stringify(nextState));
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    };
+
+    window.addEventListener('musk_db_updated', handleDbUpdated);
+    return () => {
+      window.removeEventListener('musk_db_updated', handleDbUpdated);
+    };
+  }, []);
+
   // Auto logout on inactivity (10 minutes)
   useEffect(() => {
     // Only set up if either a client user or admin user is logged in

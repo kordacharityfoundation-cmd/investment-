@@ -48,3 +48,13 @@ body {
   filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.4));
 }
 
+@keyframes loadingBar {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-loading-bar {
+  animation: loadingBar 2.5s infinite ease-in-out;
+}
+
