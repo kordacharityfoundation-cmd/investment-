@@ -121,6 +121,20 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
     triggerNotice(`User account successfully ${nextStatus === 'Active' ? 'Activated' : 'Suspended'}.`);
   };
 
+  const handleDeleteUserPermanently = (id: string) => {
+    const targetUser = usersList.find(u => u.id === id);
+    if (!targetUser) return;
+    
+    if (confirm(`Are you sure you want to PERMANENTLY delete the investor account for ${targetUser.name} (${targetUser.email})?\nThis action is irreversible.`)) {
+      const updated = usersList.filter(u => u.id !== id);
+      localStorage.setItem('musk_users', JSON.stringify(updated));
+      setUsersList(updated);
+      
+      logActivity('admin@muskinvestment.com', `Permanently deleted user account for ${targetUser.email}`, 'Admin');
+      triggerNotice(`User account ${targetUser.email} has been permanently deleted.`, 'success');
+    }
+  };
+
   // 2. Deposit Approval Control
   const handleApproveDeposit = (id: string) => {
     const targetDep = depositsList.find(d => d.id === id);
@@ -304,10 +318,15 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
   };
 
   const handleToggleGateway = (key: string) => {
-    setPaymentConfig((prev: any) => ({
-      ...prev,
-      [key]: prev[key] === false ? true : false
-    }));
+    setPaymentConfig((prev: any) => {
+      const next = {
+        ...prev,
+        [key]: prev[key] === false ? true : false
+      };
+      localStorage.setItem('musk_payment_config', JSON.stringify(next));
+      return next;
+    });
+    triggerNotice('Gateway visibility status updated instantly.');
   };
 
   // 6. QR Code Image File Uploads
@@ -826,24 +845,32 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
                           </span>
                         </td>
                         <td className="p-4 text-right">
-                          <button
-                            onClick={() => handleToggleUserStatus(u.id, u.status)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all inline-flex items-center gap-1 min-h-[30px] ${
-                              u.status === 'Active' 
-                                ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/20 text-red-400' 
-                                : 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20 text-emerald-400'
-                            }`}
-                          >
-                            {u.status === 'Active' ? (
-                              <>
-                                <UserMinus className="h-3.5 w-3.5" /> Suspend Account
-                              </>
-                            ) : (
-                              <>
-                                <UserCheck className="h-3.5 w-3.5" /> Activate Account
-                              </>
-                            )}
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleToggleUserStatus(u.id, u.status)}
+                              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all inline-flex items-center gap-1 min-h-[30px] ${
+                                u.status === 'Active' 
+                                  ? 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/20 text-amber-400' 
+                                  : 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20 text-emerald-400'
+                              }`}
+                            >
+                              {u.status === 'Active' ? (
+                                <>
+                                  <UserMinus className="h-3.5 w-3.5" /> Suspend
+                                </>
+                              ) : (
+                                <>
+                                  <UserCheck className="h-3.5 w-3.5" /> Activate
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUserPermanently(u.id)}
+                              className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all inline-flex items-center gap-1 min-h-[30px]"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" /> Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))

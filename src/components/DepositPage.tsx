@@ -164,6 +164,18 @@ export default function DepositPage({ user, initialSelectedPlan, onBackToDashboa
     }] : [])
   ];
 
+  // Auto-select the first available active payment method if the current one is disabled or not set
+  useEffect(() => {
+    if (paymentMethods.length > 0) {
+      const isStillValid = paymentMethods.some(m => m.id === chosenPaymentMethod?.id);
+      if (!isStillValid) {
+        setChosenPaymentMethod(paymentMethods[0]);
+      }
+    } else {
+      setChosenPaymentMethod(null);
+    }
+  }, [paymentConfig, qrConfig]);
+
   const handleCopyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
