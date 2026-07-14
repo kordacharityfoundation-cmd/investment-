@@ -153,6 +153,8 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
       const searchParams = new URLSearchParams(window.location.search);
       const referralCode = searchParams.get('ref') || '';
 
+      const isFirstUser = currentUsers.length === 0;
+
       const newUser = {
         id: `user-${Date.now()}`,
         name: regName,
@@ -162,7 +164,9 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
         status: 'Active' as const,
         dateCreated: new Date().toISOString().substring(0, 10),
         password: regPassword,
-        referredBy: referralCode
+        referredBy: referralCode,
+        role: isFirstUser ? 'admin' : 'user',
+        isAdmin: isFirstUser ? true : false
       };
 
       currentUsers.push(newUser);

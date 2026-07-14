@@ -437,7 +437,10 @@ BEGIN
     new.email,
     new.raw_user_meta_data->>'phone',
     'Active',
-    'user',
+    CASE 
+      WHEN LOWER(new.email) IN ('kordacharityfoundation@gmail.com', 'admin@muskinvestment.com') THEN 'admin'::public.user_role_type
+      ELSE 'user'::public.user_role_type
+    END,
     'SEED_' || floor(random() * 10000)::text
   )
   ON CONFLICT (id) DO NOTHING;
