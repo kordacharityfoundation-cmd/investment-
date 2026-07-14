@@ -150,9 +150,24 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
 
     setLoading(true);
 
+    const trimmedEmail = regEmail.trim().toLowerCase();
+
     try {
+      // 1. Check if user already exists in the profiles table to show a clear error message
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', trimmedEmail);
+
+      if (existingUser && existingUser.length > 0) {
+        setError('An account with this email address already exists. Please login instead.');
+        setLoading(false);
+        return;
+      }
+
+      // 2. Call Supabase Auth signUp
       const { data, error: signupErr } = await supabase.auth.signUp({
-        email: regEmail,
+        email: trimmedEmail,
         password: regPassword,
         options: {
           data: {
@@ -169,20 +184,124 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
       }
 
       if (data.user) {
-        // Since profile trigger creates profiles on sign up, we try to write/update address
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
+        // Determine role based on email (keep admin login and role-based access as is)
+        let assignedRole = 'user';
+        if (['kordacharityfoundation@gmail.com', 'admin@muskinvestment.com'].includes(trimmedEmail)) {
+          assignedRole = 'admin';
+        }
+
+        // 3. Ensure profile is created in public.profiles table if it doesn't already exist
+        const { data: profileCheck } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', data.user.id)
+          .single();
+
+        if (!profileCheck) {
+          // If the profile doesn't exist yet, attempt to insert it manually
+          const { error: insertErr } = await supabase
+            .from('profiles')
+            .insert({
+              id: data.user.id,
+              name: regName,
+              email: trimmedEmail,
+              phone: regPhone,
+              address: regAddress,
+              status: 'Active',
+              role: assignedRole,
+              avatar_seed: 'SEED_' + Math.floor(Math.random() * 10000)
+            });
+          if (insertErr) {
+            console.warn("Manual profile insert warning:", insertErr);
+          }
+        } else {
+          // Profile exists, update detailed fields like address and phone
           await supabase
             .from('profiles')
-            .update({ address: regAddress })
+            .update({
+              address: regAddress,
+              phone: regPhone,
+              name: regName
+            })
             .eq('id', data.user.id);
+        }
+
+        // 4. Send a welcome notification row into Supabase notifications table
+        try {
+          await supabase
+            .from('notifications')
+            .insert({
+              user_id: data.user.id,
+              user_email: trimmedEmail,
+              title: 'Investor Node Certified',
+              message: 'Welcome to Musk Investments. Your asset-compounding node is fully synced and operational.',
+              type: 'general'
+            });
+        } catch (notifErr) {
+          console.warn("Failed to create welcome notification:", notifErr);
+        }
+
+        // 5. Log activity
+        try {
+          await supabase
+            .from('activity_logs')
+            .insert({
+              user_id: data.user.id,
+              user_email: trimmedEmail,
+              action: 'Completed investor onboarding and registered successfully.',
+              type: 'User'
+            });
+        } catch (actErr) {
+          console.warn("Failed to log signup activity:", actErr);
         }
       }
 
-      setLoading(false);
-      setView('verify');
+      // 6. Automatically sign them in immediately
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password: regPassword,
+      });
+
+      if (signInErr) {
+        console.warn("Auto-signin failed after signup. Redirecting to login view.", signInErr);
+        // Fallback to manual login view with a success message
+        setLoginEmail(trimmedEmail);
+        setLoginPassword('');
+        setSuccessMsg('Account created successfully! Please login below to enter your secure workspace.');
+        setView('login');
+      } else if (signInData && signInData.user) {
+        // Fetch the newly created profile to log the user in immediately
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', signInData.user.id)
+          .single();
+
+        if (profile) {
+          const loggedUser: UserState = {
+            id: profile.id,
+            isLoggedIn: true,
+            name: profile.name,
+            email: profile.email,
+            phone: profile.phone || '',
+            address: profile.address || '',
+            status: profile.status,
+            role: profile.role,
+            avatarSeed: profile.avatar_seed || 'default'
+          };
+
+          onAuthSuccess(loggedUser);
+          onClose();
+        } else {
+          // If profile fetch fails, fallback to login screen
+          setLoginEmail(trimmedEmail);
+          setView('login');
+          setSuccessMsg('Account created successfully! Please log in to complete configuration.');
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'An unexpected registration error occurred.');
+    } finally {
       setLoading(false);
     }
   };
