@@ -16,7 +16,7 @@ import {
 import { InvestmentPlan } from '../types';
 import { DepositTransaction } from './Plans';
 
-export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) {
+export default function AdminDashboard({ onLogout, adminEmail = 'admin@muskinvestment.com' }: { onLogout?: () => void; adminEmail?: string }) {
   // Database states
   const [usersList, setUsersList] = useState<AdminUser[]>([]);
   const [depositsList, setDepositsList] = useState<DepositTransaction[]>([]);
@@ -114,7 +114,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
     
     const targetUser = usersList.find(u => u.id === id);
     if (targetUser) {
-      logActivity('admin@muskinvestment.com', `Changed status of user ${targetUser.email} to ${nextStatus}`, 'Admin');
+      logActivity(adminEmail, `Changed status of user ${targetUser.email} to ${nextStatus}`, 'Admin');
       addNotification(targetUser.email, 'Account Status Updated', `Your investor account status has been updated to ${nextStatus} by our security compliance desk.`, 'general');
     }
 
@@ -130,7 +130,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
       localStorage.setItem('musk_users', JSON.stringify(updated));
       setUsersList(updated);
       
-      logActivity('admin@muskinvestment.com', `Permanently deleted user account for ${targetUser.email}`, 'Admin');
+      logActivity(adminEmail, `Permanently deleted user account for ${targetUser.email}`, 'Admin');
       triggerNotice(`User account ${targetUser.email} has been permanently deleted.`, 'success');
     }
   };
@@ -149,7 +149,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
 
     if (targetDep) {
       const email = targetDep.userEmail || (targetDep as any).email || 'user@example.com';
-      logActivity('admin@muskinvestment.com', `Approved deposit request of $${targetDep.amount} (Ref: ${targetDep.referenceNo})`, 'Admin');
+      logActivity(adminEmail, `Approved deposit request of $${targetDep.amount} (Ref: ${targetDep.referenceNo})`, 'Admin');
       addNotification(email, 'Deposit Approved', `Your deposit of $${targetDep.amount} for the plan "${targetDep.planName}" has been approved. Your yield compounding cycle starts immediately.`, 'deposit_approved');
     }
 
@@ -169,7 +169,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
 
     if (targetDep) {
       const email = targetDep.userEmail || (targetDep as any).email || 'user@example.com';
-      logActivity('admin@muskinvestment.com', `Rejected deposit request of $${targetDep.amount} (Ref: ${targetDep.referenceNo})`, 'Admin');
+      logActivity(adminEmail, `Rejected deposit request of $${targetDep.amount} (Ref: ${targetDep.referenceNo})`, 'Admin');
       addNotification(email, 'Deposit Rejected', `Your deposit of $${targetDep.amount} was rejected. Please open a support ticket or verify your receipt screenshot.`, 'deposit_rejected');
     }
 
@@ -189,7 +189,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
     setWithdrawalsList(updated);
 
     if (targetWth) {
-      logActivity('admin@muskinvestment.com', `Approved withdrawal request of $${targetWth.amount} (Ref: ${targetWth.referenceNo})`, 'Admin');
+      logActivity(adminEmail, `Approved withdrawal request of $${targetWth.amount} (Ref: ${targetWth.referenceNo})`, 'Admin');
       addNotification(targetWth.userEmail, 'Withdrawal Completed', `Your withdrawal request of $${targetWth.amount} has been approved and processed. Funds have been sent to your designated wallet/account.`, 'withdrawal_approved');
     }
 
@@ -208,7 +208,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
     setWithdrawalsList(updated);
 
     if (targetWth) {
-      logActivity('admin@muskinvestment.com', `Rejected withdrawal request of $${targetWth.amount} (Ref: ${targetWth.referenceNo})`, 'Admin');
+      logActivity(adminEmail, `Rejected withdrawal request of $${targetWth.amount} (Ref: ${targetWth.referenceNo})`, 'Admin');
       addNotification(targetWth.userEmail, 'Withdrawal Rejected', `Your withdrawal request of $${targetWth.amount} was rejected. Please contact support or check your account dashboard details.`, 'withdrawal_rejected');
     }
 
@@ -384,7 +384,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
     localStorage.setItem('musk_announcements', JSON.stringify(updated));
     setAnnouncement(updated);
     triggerNotice('Announcement removed.');
-    logActivity('admin@muskinvestment.com', `Deleted system announcement ID: ${id}`, 'Admin');
+    logActivity(adminEmail, `Deleted system announcement ID: ${id}`, 'Admin');
   };
 
   // Support Ticket reply & resolve
@@ -421,7 +421,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
     // Find ticket user
     const targetTicket = saved.find(t => t.id === ticketId);
     if (targetTicket) {
-      logActivity('admin@muskinvestment.com', `Replied to ticket: "${targetTicket.subject}"`, 'Admin');
+      logActivity(adminEmail, `Replied to ticket: "${targetTicket.subject}"`, 'Admin');
       addNotification(targetTicket.userEmail, 'Support Ticket Response', `An administrator has replied to your ticket: "${targetTicket.subject}".`, 'general');
     }
     
@@ -441,7 +441,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
     
     const targetTicket = saved.find(t => t.id === ticketId);
     if (targetTicket) {
-      logActivity('admin@muskinvestment.com', `Resolved support ticket ID: ${ticketId}`, 'Admin');
+      logActivity(adminEmail, `Resolved support ticket ID: ${ticketId}`, 'Admin');
       addNotification(targetTicket.userEmail, 'Support Ticket Resolved', `Your ticket "${targetTicket.subject}" has been marked as resolved.`, 'general');
     }
     triggerNotice('Support ticket marked as Resolved.');
@@ -453,7 +453,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
       const updated = usersList.filter(u => u.id !== id);
       localStorage.setItem('musk_users', JSON.stringify(updated));
       setUsersList(updated);
-      logActivity('admin@muskinvestment.com', `Deleted user account ID: ${id}`, 'Admin');
+      logActivity(adminEmail, `Deleted user account ID: ${id}`, 'Admin');
       triggerNotice('Investor record permanently purged.');
     }
   };
@@ -462,7 +462,7 @@ export default function AdminDashboard({ onLogout }: { onLogout?: () => void }) 
   const handleUpdateSystemSettings = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('musk_system_settings', JSON.stringify(systemSettings));
-    logActivity('admin@muskinvestment.com', 'Modified global system status and maintenance metrics', 'Admin');
+    logActivity(adminEmail, 'Modified global system status and maintenance metrics', 'Admin');
     triggerNotice('Global website parameters updated instantly.');
   };
 

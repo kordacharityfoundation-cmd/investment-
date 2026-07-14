@@ -287,6 +287,9 @@ export default function App() {
     e.preventDefault();
     setAdminError('');
 
+    const trimmedEmail = adminEmail.trim().toLowerCase();
+    const trimmedPassword = adminPassword.trim();
+
     // Query registered users dynamically
     const savedUsersRaw = localStorage.getItem('musk_users');
     let usersList = [];
@@ -296,29 +299,28 @@ export default function App() {
       } catch (err) {}
     }
 
-    // Check if the user is in the database with matching email and password
+    // Check if the user is in the database with matching email and password (trimmed)
     const matchedUser = usersList.find((u: any) => 
-      u.email.toLowerCase() === adminEmail.toLowerCase() && 
-      u.password === adminPassword
+      u.email.trim().toLowerCase() === trimmedEmail && 
+      (u.password || '').trim() === trimmedPassword
     );
 
-    const isHardcodedAdmin = (adminEmail.toLowerCase() === 'admin@muskinvestment.com' && adminPassword === 'admin123') ||
-                             (adminEmail.toLowerCase() === 'kordacharityfoundation@gmail.com' && adminPassword === '#Deemainzino1');
-
-    const isAdminUser = isHardcodedAdmin || (matchedUser && (
+    const isAdminUser = !!matchedUser && (
+      matchedUser.role === 'admin' ||
+      matchedUser.isAdmin === true ||
       matchedUser.name.toLowerCase().includes('admin') || 
       matchedUser.email.toLowerCase().includes('admin')
-    ));
+    );
 
-    if (isAdminUser) {
+    if (isAdminUser && matchedUser) {
       setAdminLoading(true);
       setTimeout(() => {
         setAdminLoading(false);
-        const adminName = matchedUser ? matchedUser.name : (adminEmail === 'kordacharityfoundation@gmail.com' ? 'Lead Administrator' : 'Root Administrator');
+        const adminName = matchedUser.name || 'Administrator';
         const loggedAdmin: UserState = {
           isLoggedIn: true,
           name: adminName,
-          email: adminEmail,
+          email: trimmedEmail,
           avatarSeed: 'ADMIN'
         };
         setAdminUser(loggedAdmin);
@@ -353,7 +355,7 @@ export default function App() {
               </button>
             </div>
             
-            <AdminDashboard onLogout={handleAdminLogout} />
+            <AdminDashboard onLogout={handleAdminLogout} adminEmail={adminUser?.email} />
           </div>
         ) : (
           <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 bg-[#02020a] relative">
@@ -408,7 +410,7 @@ export default function App() {
                         id="admin-email-input"
                         type="email"
                         required
-                        placeholder="admin@muskinvestment.com"
+                        placeholder="admin@domain.com"
                         value={adminEmail}
                         onChange={(e) => setAdminEmail(e.target.value)}
                         className="w-full rounded-xl border border-white/5 bg-white/5 pl-11 pr-4 py-3.5 text-xs text-white placeholder-gray-600 focus:border-red-500/30 focus:bg-white/[0.08] focus:outline-none focus:ring-1 focus:ring-red-500/20 transition-all min-h-[44px]"

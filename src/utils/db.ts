@@ -10,6 +10,8 @@ export interface AdminUser {
   dateCreated: string;
   password?: string;
   referredBy?: string;
+  role?: string;
+  isAdmin?: boolean;
 }
 
 export interface WithdrawalRequest {
@@ -146,18 +148,7 @@ export const DEFAULT_PLANS: InvestmentPlan[] = [
 ];
 
 // Default users
-export const DEFAULT_USERS: AdminUser[] = [
-  {
-    id: 'user-2',
-    name: 'Charity Admin',
-    email: 'kordacharityfoundation@gmail.com',
-    phone: '+380 (50) 123-4567',
-    address: '12 Kiev Street, Ukraine',
-    status: 'Active',
-    dateCreated: '2026-07-01',
-    password: '#Deemainzino1'
-  }
-];
+export const DEFAULT_USERS: AdminUser[] = [];
 
 // Default announcements
 export const DEFAULT_ANNOUNCEMENTS: Announcement[] = [
@@ -289,19 +280,21 @@ export function initializeDatabase() {
   
   const existingUsersRaw = localStorage.getItem('musk_users');
   if (!existingUsersRaw) {
-    localStorage.setItem('musk_users', JSON.stringify(DEFAULT_USERS));
+    localStorage.setItem('musk_users', JSON.stringify([]));
   } else {
     // Proactive auto-cleanup: If there are demo users in the cached list, filter them out!
     try {
       const parsedUsers = JSON.parse(existingUsersRaw);
       if (Array.isArray(parsedUsers)) {
-        const demoEmails = ['elon@tesla.com', 'gwynne@spacex.com', 'starbase_intern@spacex.com'];
-        const cleanUsers = parsedUsers.filter((u: any) => u && u.email && !demoEmails.includes(u.email));
-        
-        if (cleanUsers.length !== parsedUsers.length) {
-          console.log(`[Auto-Cleanup] Purging ${parsedUsers.length - cleanUsers.length} demo users from local storage cache.`);
-          localStorage.setItem('musk_users', JSON.stringify(cleanUsers));
-        }
+        const demoEmails = [
+          'elon@tesla.com', 
+          'gwynne@spacex.com', 
+          'starbase_intern@spacex.com',
+          'kordacharityfoundation@gmail.com',
+          'admin@muskinvestment.com'
+        ];
+        const cleanUsers = parsedUsers.filter((u: any) => u && u.email && !demoEmails.map(e => e.toLowerCase()).includes(u.email.toLowerCase()));
+        localStorage.setItem('musk_users', JSON.stringify(cleanUsers));
       }
     } catch (e) {
       console.error("Error running auto-cleanup on cached users:", e);

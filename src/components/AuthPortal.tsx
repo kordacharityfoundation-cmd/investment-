@@ -60,7 +60,10 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
     setError('');
     setSuccessMsg('');
 
-    if (!loginEmail || !loginPassword) {
+    const trimmedEmail = loginEmail.trim().toLowerCase();
+    const trimmedPassword = loginPassword.trim();
+
+    if (!trimmedEmail || !trimmedPassword) {
       setError('Please enter both your email address and password.');
       return;
     }
@@ -79,7 +82,7 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
         }
       }
 
-      const userFound = usersList.find((u: any) => u.email.toLowerCase() === loginEmail.toLowerCase());
+      const userFound = usersList.find((u: any) => u.email.trim().toLowerCase() === trimmedEmail);
       if (!userFound) {
         setError('This email address is not registered on our gateway. Please register first.');
         return;
@@ -90,7 +93,7 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
         return;
       }
 
-      const isValidPassword = !userFound.password || userFound.password === loginPassword;
+      const isValidPassword = !userFound.password || userFound.password.trim() === trimmedPassword;
       if (!isValidPassword) {
         setError('Invalid compliance password signature. Please verify your credentials.');
         return;
