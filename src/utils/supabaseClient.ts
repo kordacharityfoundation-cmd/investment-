@@ -86,47 +86,22 @@ const createMockSupabase = () => {
             return { error: null };
           };
         }
-        if (prop === 'functions') {
-          return {
-            invoke: async (functionName: string, options?: any) => {
-              if (functionName === 'register-user') {
-                try {
-                  const res = await fetch('/api/register-user', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(options?.body || {}),
-                  });
-                  const result = await res.json();
-                  if (!res.ok) {
-                    return { data: null, error: new Error(result.error || 'Registration failed.') };
-                  }
-                  return { data: result, error: null };
-                } catch (err: any) {
-                  return { data: null, error: err };
-                }
-              }
-              return { data: null, error: new Error('Unknown edge function requested.') };
-            }
-          };
-        }
         if (prop === 'from') {
           return (tableName: string) => {
             const queryBuilder: any = {
               isSingleFilter: null,
-              select: () => queryBuilder,
-              eq: (colName: string, colValue: any) => {
-                queryBuilder.isSingleFilter = { colName, colValue };
-                return queryBuilder;
+              select: function() { return this; },
+              eq: function(colName: string, colValue: any) {
+                this.isSingleFilter = { colName, colValue };
+                return this;
               },
-              single: async () => {
-                if (tableName === 'profiles' && queryBuilder.isSingleFilter) {
+              single: async function() {
+                if (tableName === 'profiles' && this.isSingleFilter) {
                   const raw = localStorage.getItem('musk_mock_session');
                   if (raw) {
                     try {
                       const parsed = JSON.parse(raw);
-                      if (parsed.profile && parsed.profile.id === queryBuilder.isSingleFilter.colValue) {
+                      if (parsed.profile && parsed.profile.id === this.isSingleFilter.colValue) {
                         return { data: parsed.profile, error: null };
                       }
                     } catch {}
@@ -134,13 +109,23 @@ const createMockSupabase = () => {
                 }
                 return { data: null, error: { message: 'Not found.' } };
               },
-              insert: () => queryBuilder,
-              update: () => queryBuilder,
-              delete: () => queryBuilder,
-              neq: () => queryBuilder,
-              then: (resolve: any) => resolve({ data: [], error: null })
+              insert: function() { return this; },
+              update: function() { return this; },
+              delete: function() { return this; },
+              neq: function() { return this; },
+              then: function(resolve: any) { resolve({ data: [], error: null }); }
             };
-            return queryBuilder;
+
+            const proxyBuilder = new Proxy(queryBuilder, {
+              get(target, key) {
+                if (key in target) {
+                  return target[key as keyof typeof target];
+                }
+                // Return a chainable dummy method that returns the proxy itself
+                return () => proxyBuilder;
+              }
+            });
+            return proxyBuilder;
           };
         }
         return makeChain();
@@ -159,43 +144,6 @@ const isValidUrl = (url: string) => {
   }
 };
 
-const buildRealClient = () => {
-  const client = createClient(supabaseUrl, supabaseAnonKey);
-  
-  return new Proxy(client, {
-    get(target, prop) {
-      if (prop === 'functions') {
-        return {
-          invoke: async (functionName: string, options?: any) => {
-            if (functionName === 'register-user') {
-              try {
-                const res = await fetch('/api/register-user', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify(options?.body || {}),
-                });
-                const result = await res.json();
-                if (!res.ok) {
-                  return { data: null, error: new Error(result.error || 'Registration failed.') };
-                }
-                return { data: result, error: null };
-              } catch (err: any) {
-                return { data: null, error: err };
-              }
-            }
-            return { data: null, error: new Error('Unknown edge function requested.') };
-          }
-        };
-      }
-      return target[prop as keyof typeof target];
-    }
-  });
-};
-
 export const supabase = (supabaseUrl && isValidUrl(supabaseUrl) && supabaseAnonKey)
-  ? buildRealClient()
+  ? createClient(supabaseUrl, supabaseAnonKey)
   : createMockSupabase();
-
-

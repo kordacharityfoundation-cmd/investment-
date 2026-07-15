@@ -164,19 +164,40 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
         return;
       }
 
-      // 2. Call the register-user Edge Function instead of supabase.auth.signUp()
-      const { data, error: signupErr } = await supabase.functions.invoke('register-user', {
-        body: {
-          email: trimmedEmail,
-          password: regPassword,
-          name: regName,
-          phone: regPhone,
-          address: regAddress
-        }
-      });
+      // 2. Call the register-user API endpoint instead of supabase.auth.signUp()
+      let data: any = {};
+      try {
+        const response = await fetch('/api/register-user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: trimmedEmail,
+            password: regPassword,
+            name: regName,
+            phone: regPhone,
+            address: regAddress
+          })
+        });
 
-      if (signupErr) {
-        setError(signupErr.message || 'Registration failed. Please try again.');
+        if (!response.ok) {
+          const text = await response.text();
+          let parsedErr = '';
+          try {
+            const parsed = JSON.parse(text);
+            parsedErr = parsed.error;
+          } catch {}
+          throw new Error(parsedErr || text || `HTTP error! Status: ${response.status}`);
+        }
+
+        try {
+          data = await response.json();
+        } catch (e) {
+          throw new Error('Invalid server response format.');
+        }
+      } catch (err: any) {
+        setError(err.message || 'Registration failed. Please try again.');
         setLoading(false);
         return;
       }
