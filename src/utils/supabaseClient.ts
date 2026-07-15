@@ -91,6 +91,63 @@ const createMockSupabase = () => {
             }
           };
         }
+        if (prop === 'signUp') {
+          return async (params: any) => {
+            try {
+              const name = params.options?.data?.name || 'New Investor';
+              const phone = params.options?.data?.phone || '';
+              const address = params.options?.data?.address || '';
+              
+              const res = await fetch('/api/register-user', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  email: params.email,
+                  password: params.password,
+                  name,
+                  phone,
+                  address,
+                }),
+              });
+              if (!res.ok) {
+                const text = await res.text();
+                let parsedErr = '';
+                try {
+                  const parsed = JSON.parse(text);
+                  parsedErr = parsed.error;
+                } catch {}
+                return { data: { user: null, session: null }, error: { message: parsedErr || text || `HTTP error! Status: ${res.status}` } };
+              }
+              let result: any = {};
+              try {
+                result = await res.json();
+              } catch {
+                return { data: { user: null, session: null }, error: { message: 'Invalid server response format.' } };
+              }
+              
+              // In mock environment, simulate immediate sign-in (email confirmation bypassed/disabled)
+              const fakeSession = {
+                access_token: 'mock-token-' + Date.now(),
+                user: {
+                  id: result.userId,
+                  email: params.email,
+                  user_metadata: params.options?.data || {}
+                }
+              };
+              localStorage.setItem('musk_mock_session', JSON.stringify(fakeSession));
+              return { data: { user: fakeSession.user, session: fakeSession }, error: null };
+            } catch (err: any) {
+              return { data: { user: null, session: null }, error: { message: err.message || 'Registration failed.' } };
+            }
+          };
+        }
+        if (prop === 'exchangeCodeForSession') {
+          return async (code: string) => {
+            return { data: { session: null }, error: null };
+          };
+        }
         if (prop === 'signOut') {
           return async () => {
             localStorage.removeItem('musk_mock_session');

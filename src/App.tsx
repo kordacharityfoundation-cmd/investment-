@@ -13,6 +13,7 @@ import Footer from './components/Footer';
 import AuthPortal from './components/AuthPortal';
 import UserDashboard from './components/UserDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import AuthCallback from './components/AuthCallback';
 import { UserState, InvestmentPlan } from './types';
 import { 
   Globe, LayoutDashboard, Settings, Mail, Lock, ShieldAlert, ArrowLeft, Eye, EyeOff 
@@ -22,6 +23,12 @@ export default function App() {
   const [user, setUser] = useState<UserState | null>(null);
   const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'deposit'>('landing');
   const [selectedPlanForDeposit, setSelectedPlanForDeposit] = useState<InvestmentPlan | null>(null);
+
+  // Auth callback routing state
+  const [isAuthCallback, setIsAuthCallback] = useState(() => {
+    const pathname = window.location.pathname;
+    return pathname === '/auth/callback' || pathname.endsWith('/auth/callback');
+  });
 
   // Admin routing state
   const [isAdminRoute, setIsAdminRoute] = useState(() => {
@@ -46,8 +53,12 @@ export default function App() {
     const handleUrlChange = () => {
       const pathname = window.location.pathname;
       const hash = window.location.hash;
+      
       const isCurrentlyAdmin = pathname === '/admin' || pathname.endsWith('/admin') || hash === '#/admin' || hash === '#admin';
       setIsAdminRoute(isCurrentlyAdmin);
+
+      const isCurrentlyCallback = pathname === '/auth/callback' || pathname.endsWith('/auth/callback');
+      setIsAuthCallback(isCurrentlyCallback);
     };
 
     window.addEventListener('popstate', handleUrlChange);
@@ -340,6 +351,22 @@ export default function App() {
       setAdminLoading(false);
     }
   };
+
+  if (isAuthCallback) {
+    return (
+      <AuthCallback
+        onSuccess={(mappedUser) => {
+          handleAuthSuccess(mappedUser);
+          setIsAuthCallback(false);
+        }}
+        onFailure={() => {
+          setIsAuthCallback(false);
+          handleSetView('landing');
+          handleOpenAuth('login');
+        }}
+      />
+    );
+  }
 
   if (isAdminRoute) {
     return (

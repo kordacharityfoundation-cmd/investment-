@@ -164,69 +164,42 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
         return;
       }
 
-      // 2. Call the register-user API endpoint instead of supabase.auth.signUp()
-      let data: any = {};
-      try {
-        const response = await fetch('/api/register-user', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: trimmedEmail,
-            password: regPassword,
+      // 2. Call supabase.auth.signUp() directly
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password: regPassword,
+        options: {
+          emailRedirectTo: "https://investment-nine-mocha.vercel.app/auth/callback",
+          data: {
             name: regName,
             phone: regPhone,
             address: regAddress
-          })
-        });
-
-        if (!response.ok) {
-          const text = await response.text();
-          let parsedErr = '';
-          try {
-            const parsed = JSON.parse(text);
-            parsedErr = parsed.error;
-          } catch {}
-          throw new Error(parsedErr || text || `HTTP error! Status: ${response.status}`);
+          }
         }
-
-        try {
-          data = await response.json();
-        } catch (e) {
-          throw new Error('Invalid server response format.');
-        }
-      } catch (err: any) {
-        setError(err.message || 'Registration failed. Please try again.');
-        setLoading(false);
-        return;
-      }
-
-      if (data && data.error) {
-        setError(data.error);
-        setLoading(false);
-        return;
-      }
-
-      // 3. Automatically sign them in immediately
-      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-        email: trimmedEmail,
-        password: regPassword,
       });
 
-      if (signInErr) {
-        console.warn("Auto-signin failed after signup. Redirecting to login view.", signInErr);
-        // Fallback to manual login view with a success message
-        setLoginEmail(trimmedEmail);
-        setLoginPassword('');
-        setSuccessMsg('Account created successfully! Please login below to enter your secure workspace.');
-        setView('login');
-      } else if (signInData && signInData.user) {
+      if (signUpErr) {
+        setError(signUpErr.message || 'Registration failed. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      const user = signUpData?.user;
+      const session = signUpData?.session;
+
+      if (!user) {
+        setError('Could not complete registration. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      // 3. If we have a session immediately (meaning email confirmation is disabled/bypassed in Supabase setup)
+      if (session) {
         // Fetch the newly created profile to log the user in immediately
         const { data: profile } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', signInData.user.id)
+          .eq('id', user.id)
           .single();
 
         if (profile) {
@@ -245,11 +218,14 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
           onAuthSuccess(loggedUser);
           onClose();
         } else {
-          // If profile fetch fails, fallback to login screen
           setLoginEmail(trimmedEmail);
           setView('login');
           setSuccessMsg('Account created successfully! Please log in to complete configuration.');
         }
+      } else {
+        // Email confirmation is active/required! Show the verification layout
+        setSuccessMsg('Registration successful! A verification email has been sent. Please click the link in the email to confirm your account and open your ledger node.');
+        setView('verify');
       }
     } catch (err: any) {
       setError(err.message || 'An unexpected registration error occurred.');
@@ -756,6 +732,57 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
 
                 <button
                   id="success-home-btn"
+                  onClick={onClose}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 py-3.5 text-sm font-semibold text-white transition-all min-h-[44px]"
+                >
+                  Return Home
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ==================== ACCOUNT VERIFICATION REQUIRED VIEW ==================== */}
+          {view === 'verify' && (
+            <motion.div
+              key="verify-view"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="text-center space-y-6"
+            >
+              <div className="inline-flex rounded-full bg-purple-500/10 p-4 border border-purple-500/20 glow-purple relative">
+                <Mail className="h-10 w-10 text-purple-400 animate-pulse" />
+                <span className="absolute -top-1 -right-1 h-3 w-3 bg-purple-500 rounded-full animate-ping" />
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-purple-400">Ledger Node Verification</span>
+                <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-none">
+                  Confirm Your Email
+                </h2>
+                <p className="text-sm text-gray-300/85 font-light leading-relaxed px-4 pt-2">
+                  {successMsg || "We have sent a verification link to your email address. Please open your inbox and click the link to authorize and sync your asset node."}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3 pt-6">
+                <button
+                  id="verify-login-btn"
+                  onClick={() => {
+                    setLoginEmail(regEmail);
+                    setView('login');
+                    setError('');
+                    setSuccessMsg('');
+                  }}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 py-4 text-base font-semibold text-white shadow-lg shadow-purple-500/20 transition-all min-h-[48px]"
+                >
+                  <span>Go to Login Screen</span>
+                  <ArrowRight className="h-5 w-5" />
+                </button>
+
+                <button
+                  id="verify-close-btn"
                   onClick={onClose}
                   className="w-full rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 py-3.5 text-sm font-semibold text-white transition-all min-h-[44px]"
                 >
