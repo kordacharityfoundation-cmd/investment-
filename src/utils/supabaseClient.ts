@@ -69,9 +69,20 @@ const createMockSupabase = () => {
                 },
                 body: JSON.stringify(credentials),
               });
-              const result = await res.json();
               if (!res.ok) {
-                return { data: { user: null, session: null }, error: { message: result.error || 'Authentication failed.' } };
+                const text = await res.text();
+                let parsedErr = '';
+                try {
+                  const parsed = JSON.parse(text);
+                  parsedErr = parsed.error;
+                } catch {}
+                return { data: { user: null, session: null }, error: { message: parsedErr || text || `HTTP error! Status: ${res.status}` } };
+              }
+              let result: any = {};
+              try {
+                result = await res.json();
+              } catch {
+                return { data: { user: null, session: null }, error: { message: 'Invalid server response format.' } };
               }
               localStorage.setItem('musk_mock_session', JSON.stringify(result));
               return { data: { user: result.user, session: result }, error: null };
@@ -90,10 +101,10 @@ const createMockSupabase = () => {
           return (tableName: string) => {
             const queryBuilder: any = {
               isSingleFilter: null,
-              select: function() { return this; },
+              select: function() { return proxyBuilder; },
               eq: function(colName: string, colValue: any) {
                 this.isSingleFilter = { colName, colValue };
-                return this;
+                return proxyBuilder;
               },
               single: async function() {
                 if (tableName === 'profiles' && this.isSingleFilter) {
@@ -109,17 +120,21 @@ const createMockSupabase = () => {
                 }
                 return { data: null, error: { message: 'Not found.' } };
               },
-              insert: function() { return this; },
-              update: function() { return this; },
-              delete: function() { return this; },
-              neq: function() { return this; },
+              insert: function() { return proxyBuilder; },
+              update: function() { return proxyBuilder; },
+              delete: function() { return proxyBuilder; },
+              neq: function() { return proxyBuilder; },
               then: function(resolve: any) { resolve({ data: [], error: null }); }
             };
 
             const proxyBuilder = new Proxy(queryBuilder, {
               get(target, key) {
                 if (key in target) {
-                  return target[key as keyof typeof target];
+                  const val = target[key];
+                  if (typeof val === 'function') {
+                    return val.bind(target);
+                  }
+                  return val;
                 }
                 // Return a chainable dummy method that returns the proxy itself
                 return () => proxyBuilder;
