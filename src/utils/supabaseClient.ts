@@ -62,6 +62,42 @@ const createMockSupabase = () => {
         if (prop === 'signInWithPassword') {
           return async (credentials: any) => {
             try {
+              const email = credentials.email?.trim().toLowerCase() || '';
+              const password = credentials.password || '';
+
+              // First, check local mock users stored in localStorage
+              const existingUsersRaw = localStorage.getItem('musk_mock_users_local');
+              const usersList = existingUsersRaw ? JSON.parse(existingUsersRaw) : [];
+              const matchedUser = usersList.find((u: any) => u.email.toLowerCase() === email && u.password === password);
+
+              if (matchedUser) {
+                const fakeSession = {
+                  access_token: 'mock-token-' + Date.now(),
+                  user: {
+                    id: matchedUser.id,
+                    email: matchedUser.email,
+                    user_metadata: {
+                      name: matchedUser.name,
+                      phone: matchedUser.phone,
+                      address: matchedUser.address
+                    }
+                  },
+                  profile: {
+                    id: matchedUser.id,
+                    name: matchedUser.name,
+                    email: matchedUser.email,
+                    phone: matchedUser.phone,
+                    address: matchedUser.address,
+                    role: matchedUser.role,
+                    status: matchedUser.status,
+                    avatar_seed: matchedUser.avatar_seed
+                  }
+                };
+                localStorage.setItem('musk_mock_session', JSON.stringify(fakeSession));
+                return { data: { user: fakeSession.user, session: fakeSession }, error: null };
+              }
+
+              // Otherwise, fall back to the login-user backend endpoint
               const res = await fetch('/api/login-user', {
                 method: 'POST',
                 headers: {
@@ -94,52 +130,63 @@ const createMockSupabase = () => {
         if (prop === 'signUp') {
           return async (params: any) => {
             try {
+              const email = params.email?.trim().toLowerCase() || '';
+              const password = params.password || '';
               const name = params.options?.data?.name || 'New Investor';
               const phone = params.options?.data?.phone || '';
               const address = params.options?.data?.address || '';
               
-              const res = await fetch('/api/register-user', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  email: params.email,
-                  password: params.password,
-                  name,
-                  phone,
-                  address,
-                }),
-              });
-              if (!res.ok) {
-                const text = await res.text();
-                let parsedErr = '';
-                try {
-                  const parsed = JSON.parse(text);
-                  parsedErr = parsed.error;
-                } catch {}
-                return { data: { user: null, session: null }, error: { message: parsedErr || text || `HTTP error! Status: ${res.status}` } };
-              }
-              let result: any = {};
-              try {
-                result = await res.json();
-              } catch {
-                return { data: { user: null, session: null }, error: { message: 'Invalid server response format.' } };
-              }
-              
-              // In mock environment, simulate immediate sign-in (email confirmation bypassed/disabled)
+              const mockUserId = 'mock-uid-' + Date.now();
+              const avatarSeed = 'SEED_' + Math.floor(Math.random() * 10000);
+              const assignedRole = ['kordacharityfoundation@gmail.com', 'admin@muskinvestment.com'].includes(email) ? 'admin' : 'user';
+
               const fakeSession = {
                 access_token: 'mock-token-' + Date.now(),
                 user: {
-                  id: result.userId,
-                  email: params.email,
+                  id: mockUserId,
+                  email,
                   user_metadata: params.options?.data || {}
+                },
+                profile: {
+                  id: mockUserId,
+                  name,
+                  email,
+                  phone,
+                  address,
+                  role: assignedRole,
+                  status: 'Active',
+                  avatar_seed: avatarSeed
                 }
               };
+              
               localStorage.setItem('musk_mock_session', JSON.stringify(fakeSession));
+
+              // Store this mock user to localStorage so signInWithPassword can query it later
+              const existingUsersRaw = localStorage.getItem('musk_mock_users_local');
+              const usersList = existingUsersRaw ? JSON.parse(existingUsersRaw) : [];
+              
+              if (usersList.some((u: any) => u.email.toLowerCase() === email)) {
+                return { data: { user: null, session: null }, error: { message: 'An account with this email address already exists. Please login instead.' } };
+              }
+
+              usersList.push({
+                id: mockUserId,
+                email,
+                password,
+                name,
+                phone,
+                address,
+                role: assignedRole,
+                status: 'Active',
+                avatar_seed: avatarSeed
+              });
+              localStorage.setItem('musk_mock_users_local', JSON.stringify(usersList));
+
+              console.log('Mock registration simulated client-side for:', email);
               return { data: { user: fakeSession.user, session: fakeSession }, error: null };
             } catch (err: any) {
-              return { data: { user: null, session: null }, error: { message: err.message || 'Registration failed.' } };
+              console.error('Mock signUp exception:', err);
+              return { data: { user: null, session: null }, error: { message: err.message || 'Mock registration failed.' } };
             }
           };
         }
