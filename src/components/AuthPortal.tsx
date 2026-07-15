@@ -164,24 +164,109 @@ export default function AuthPortal({ isOpen, onClose, initialView, onAuthSuccess
         return;
       }
 
-      // 2. Call supabase.auth.signUp() directly
-      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-        email: trimmedEmail,
-        password: regPassword,
-        options: {
-          emailRedirectTo: "https://investment-nine-mocha.vercel.app/auth/callback",
-          data: {
-            name: regName,
-            phone: regPhone,
-            address: regAddress
+      // 2. Call supabase.auth.signUp() directly as primary
+      let signUpData: any = null;
+      let signUpErr: any = null;
+      try {
+        const res = await supabase.auth.signUp({
+          email: trimmedEmail,
+          password: regPassword,
+          options: {
+            emailRedirectTo: "https://investment-nine-mocha.vercel.app/auth/callback",
+            data: {
+              name: regName,
+              phone: regPhone,
+              address: regAddress
+            }
           }
-        }
-      });
+        });
+        signUpData = res.data;
+        signUpErr = res.error;
+      } catch (e: any) {
+        signUpErr = e;
+      }
 
+      // If primary signUp fails (e.g., 500 SMTP error or database trigger issue in production),
+      // we utilize our secure server-side API registration fallback.
       if (signUpErr) {
-        setError(signUpErr.message || 'Registration failed. Please try again.');
-        setLoading(false);
-        return;
+        console.warn("Primary client-side signup failed, attempting server-side fallback...", signUpErr);
+        try {
+          const response = await fetch('/api/register-user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: trimmedEmail,
+              password: regPassword,
+              name: regName,
+              phone: regPhone,
+              address: regAddress
+            })
+          });
+
+          if (!response.ok) {
+            const text = await response.text();
+            let parsedErr = '';
+            try {
+              const parsed = JSON.parse(text);
+              parsedErr = parsed.error;
+            } catch {}
+            throw new Error(parsedErr || text || `Status ${response.status}`);
+          }
+
+          const fallbackResult = await response.json();
+          
+          // Since the server-side fallback confirms the email immediately, sign them in with password
+          const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+            email: trimmedEmail,
+            password: regPassword,
+          });
+
+          if (signInErr) {
+            setLoginEmail(trimmedEmail);
+            setLoginPassword('');
+            setView('login');
+            setSuccessMsg('Account created successfully on secure node! Please log in below to enter your secure workspace.');
+            setLoading(false);
+            return;
+          }
+
+          if (signInData && signInData.user) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', signInData.user.id)
+              .single();
+
+            if (profile) {
+              const loggedUser: UserState = {
+                id: profile.id,
+                isLoggedIn: true,
+                name: profile.name,
+                email: profile.email,
+                phone: profile.phone || '',
+                address: profile.address || '',
+                status: profile.status,
+                role: profile.role,
+                avatarSeed: profile.avatar_seed || 'default'
+              };
+              onAuthSuccess(loggedUser);
+              onClose();
+            } else {
+              setLoginEmail(trimmedEmail);
+              setView('login');
+              setSuccessMsg('Account created! Please log in to complete configuration.');
+            }
+          }
+          setLoading(false);
+          return;
+        } catch (fallbackErr: any) {
+          const mainMsg = signUpErr?.message || (typeof signUpErr === 'object' ? JSON.stringify(signUpErr) : String(signUpErr));
+          setError(`Registration failed: ${mainMsg}. Please check details or try again.`);
+          setLoading(false);
+          return;
+        }
       }
 
       const user = signUpData?.user;
